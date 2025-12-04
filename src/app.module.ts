@@ -12,6 +12,8 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { EmailModule } from './modules/email/email.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { CacheModule } from '@nestjs/cache-manager';
+import { SeedModule } from './database/seeds/seed.module';
+import { CompanyInfoModule } from './modules/companyInfo/companyInfo.module';
 
 @Module({
   imports: [
@@ -29,7 +31,8 @@ import { CacheModule } from '@nestjs/cache-manager';
           database: config.get<string>('DATABASE_NAME', 'qunuf'),
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           autoLoadEntities: true,
-          synchronize: process.env.NODE_ENV === 'development'
+          synchronize: process.env.NODE_ENV === 'development',
+          migrations: [__dirname + '/database/migration/**/*{.js,.ts}']
         })
       },
     }),
@@ -42,11 +45,13 @@ import { CacheModule } from '@nestjs/cache-manager';
     CacheModule.register({
       isGlobal: true,
     }),
+    SeedModule,
     UsersModule,
     AuthModule,
     SessionsModule,
     EmailModule,
-    SettingsModule
+    SettingsModule,
+    CompanyInfoModule
   ],
   controllers: [AppController, AuthController],
   providers: [CustomValidationPipe],

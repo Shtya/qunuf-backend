@@ -1,9 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { UsersService } from "../users/users.service";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { LoginDto } from "./dto/login.dto";
-import { User, UserStatus } from "src/common/entities/user.entity";
+import { User, UserRole, UserStatus } from "src/common/entities/user.entity";
 import { SessionsService } from "../sessions/sessions.service";
 import { Request } from "express";
 import type { StringValue } from "ms";
@@ -44,7 +44,7 @@ export class AuthService {
             throw new UnauthorizedException('Incorrect email or password');
         }
 
-        if (user.status === UserStatus.DELETED) {
+        if (user.status === UserStatus.INACTIVE || user.status === UserStatus.DELETED) {
             throw new UnauthorizedException('Your account is inactive. Please contact support.');
         }
 
@@ -71,12 +71,42 @@ export class AuthService {
         await this.sessionsService.updateRefreshTokenHash(session.id, refreshTokenHash);
 
 
-        return { accessToken, refreshToken, user: user };
+        return {
+            accessToken,
+            refreshToken,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                status: user.status,
+                lastLogin: user.lastLogin,
+            }
+        };
+
     }
 
     async register(createUserDto: any, req: Request) {
         // create user with UsersService to ensure validations/hashing
-        const user = await this.usersService.create(createUserDto);
+        const { name, email, password, role } = createUserDto;
+
+        const existingUser = await this.userRepository.findOne({
+            where: [
+                { email: email },
+            ],
+        });
+
+        if (existingUser) {
+            throw new ConflictException('Email already exists');
+        }
+
+        if (role === UserRole.ADMIN) {
+            throw new ConflictException('You cannot assign yourself as admin');
+        }
+
+        const user = await this.usersService.create({
+            name, email, password, role
+        });
 
         // generate verification code
         const code = uuidv4();
@@ -92,7 +122,7 @@ export class AuthService {
 
         // build verification link
         const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:8081');
-        const link = `${appUrl}/api/v1/auth/verify?code=${code}&email=${user.email}`;
+        const link = `${appUrl}/api/v1/auth/verify-email?code=${code}&email=${user.email}`;
 
         await this.emailService.sendVerificationEmail(user.email, link);
 
@@ -114,12 +144,13 @@ export class AuthService {
         });
 
         if (!user) {
-            throw new UnauthorizedException('User not found');
+            return { message: 'If the email is registered, a verification email has been resent.' };
         }
 
         if (user.status === UserStatus.ACTIVE) {
-            return { message: 'User already verified' };
+            return { message: 'This account is already verified.' };
         }
+
 
         const now = new Date();
 
@@ -146,14 +177,17 @@ export class AuthService {
         await this.userRepository.save(user);
 
         const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:8081');
-        const link = `${appUrl}/api/v1/auth/verify?code=${code}&email=${user.email}`;
+        const link = `${appUrl}/api/v1/auth/verify-email?code=${code}&email=${user.email}`;
 
         await this.emailService.sendVerificationEmail(user.email, link);
 
-        return { message: 'Verification email resent' };
+        return { message: 'If the email is registered, Verification email resent' };
     }
 
     async forgotPassword(email: string) {
+        if (!email) {
+            throw new BadRequestException('Email is required');
+        }
         // find active user
         const user = await this.userRepository.findOne({
             where: { email },
@@ -169,7 +203,7 @@ export class AuthService {
 
         if (!user) {
             // don't reveal whether user exists
-            return { message: 'If the email is registered, a reset link will be sent' };
+            return { message: 'If the email is registered, a reset link has been sent' };
         }
 
         if (user.status !== UserStatus.ACTIVE) {
@@ -201,11 +235,11 @@ export class AuthService {
         await this.userRepository.save(user);
 
         const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
-        const resetLink = `${frontendUrl}/reset-password?code=${code}&email=${encodeURIComponent(user.email)}`;
+        const resetLink = `${frontendUrl}/auth/reset-password?code=${code}&email=${encodeURIComponent(user.email)}`;
 
         await this.emailService.sendResetPasswordEmail(user.email, resetLink);
 
-        return { message: 'If the email is registered, a reset link will be sent' };
+        return { message: 'If the email is registered, a reset link has been sent' };
     }
 
     async resetPassword(email: string, code: string, newPassword: string) {
@@ -287,7 +321,7 @@ export class AuthService {
         await this.userRepository.save(user);
 
         const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
-        const redirectUrl = `${frontendUrl}/sign-in`;
+        const redirectUrl = `${frontendUrl}/auth/sign-in`;
 
         return { message: 'Email verified successfully', redirectUrl };
     }

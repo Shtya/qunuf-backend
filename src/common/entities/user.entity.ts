@@ -72,7 +72,7 @@ export class User extends CoreEntity {
     @Column({ type: 'timestamptz', nullable: true, name: 'last_login' })
     lastLogin: Date | null;
 
-    @OneToMany('Session', 'user')
+    @OneToMany('Session', 'User')
     sessions: Relation<Session[]>;
 
 }

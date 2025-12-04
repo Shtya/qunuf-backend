@@ -52,6 +52,7 @@ export class UsersService {
       name: createUserDto.name,
       passwordHash: hashedPassword,
       status: UserStatus.PENDING_VERIFICATION, // set default status
+      role: createUserDto.role
     });
 
     // Save it to the database

@@ -1,6 +1,9 @@
 import { Type } from 'class-transformer';
-import { IsString, IsEmail, MinLength, MaxLength, Matches, IsNotEmpty, ValidateNested, Max } from 'class-validator';
+import { IsString, IsEmail, MinLength, MaxLength, Matches, IsNotEmpty, ValidateNested, Max, IsIn } from 'class-validator';
+import { UserRole } from 'src/common/entities/user.entity';
 
+
+const allowedRoles = [UserRole.TENANT, UserRole.LANDLORD] as const;
 
 
 export class registerDto {
@@ -17,9 +20,13 @@ export class registerDto {
     @IsNotEmpty({ message: 'Password is required' })
     @MinLength(8, { message: 'Password must be at least 8 characters long' })
     @MaxLength(20, { message: 'Password must not exceed 20 characters' })
-    @Matches(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])/, {
+    @Matches(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@#$!%*?&])/, {
         message:
             'Password must contain uppercase, lowercase, number, and special character',
     })
     password: string;
+
+
+    @IsIn(allowedRoles, { message: 'Role must be either TENANT or LANDLORD' })
+    role: UserRole;
 }

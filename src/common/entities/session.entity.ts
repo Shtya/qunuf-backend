@@ -19,7 +19,7 @@ export class Session extends CoreEntity {
     ipAddress: string | null;
 
     // Relation to User (string-based to avoid circular dependency)
-    @ManyToOne('User', 'Session', { onDelete: 'CASCADE' })
+    @ManyToOne('User', 'Session')
     @JoinColumn({ name: 'user_id' })
     user: Relation<User>;
 }

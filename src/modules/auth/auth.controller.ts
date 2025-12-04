@@ -29,12 +29,12 @@ export class AuthController {
         return await this.authService.register(dto, req);
     }
 
-    @Post('resend-verification')
+    @Post('resend-verification-email')
     async resendVerification(@Body('email') email: string) {
         return await this.authService.resendVerification(email);
     }
 
-    @Get('verify')
+    @Get('verify-email')
     async verify(@Query('code') code: string, @Query('email') email: string, @Res() res: Response) {
         const result = await this.authService.verify(code, email);
         return res.redirect(result.redirectUrl);

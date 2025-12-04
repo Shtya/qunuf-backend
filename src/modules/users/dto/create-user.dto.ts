@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsString, IsEmail, MinLength, MaxLength, Matches, IsNotEmpty, ValidateNested, Max } from 'class-validator';
-
+import { IsString, IsEmail, MinLength, MaxLength, Matches, IsNotEmpty, ValidateNested, Max, IsIn, isEnum, IsEnum } from 'class-validator';
+import { UserRole } from 'src/common/entities/user.entity';
 
 
 export class CreateUserDto {
@@ -22,4 +22,7 @@ export class CreateUserDto {
             'Password must contain uppercase, lowercase, number, and special character',
     })
     password: string;
+
+    @IsEnum(UserRole, { message: 'Role must be either TENANT or LANDLORD' })
+    role: UserRole;
 }

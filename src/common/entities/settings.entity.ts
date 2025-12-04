@@ -5,15 +5,6 @@ import { CoreEntity } from "./coreEntity";
 
 @Entity('settings')
 export class Settings extends CoreEntity {
-    @Column({ type: 'text', nullable: true })
-    vision: string | null;
-
-    @Column({ type: 'text', nullable: true })
-    goals: string | null;
-
-    @Column({ type: 'text', nullable: true })
-    missions: string | null;
-
     @Column({ name: "privacy_policy", type: 'text', nullable: true })
     privacyPolicy: string | null;
 
