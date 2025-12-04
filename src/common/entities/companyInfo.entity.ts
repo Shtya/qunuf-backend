@@ -1,5 +1,6 @@
 import { Column, Entity } from "typeorm";
 import { CoreEntity } from "./coreEntity";
+import { ApiProperty } from "@nestjs/swagger";
 
 export enum CompanySection {
     VISION = 'vision',
@@ -14,19 +15,23 @@ export class CompanyInfo extends CoreEntity {
     @Column({
         type: 'enum',
         enum: CompanySection,
-        name: 'section_key',
+        unique: true
     })
-    sectionKey: CompanySection;
+    section: string;
 
     @Column({ length: 255 })
-    title: string;
+    title_ar: string;
 
-    @Column({ type: 'varchar', length: 10, default: 'en', comment: 'Language code (e.g., en, ar)' })
-    lang: string;
+    @Column({ length: 255 })
+    title_en: string;
 
     @Column({ type: 'text', name: 'text_en' })
-    contentEn: string | null;
+    content_en: string | null;
 
     @Column({ type: 'text', name: 'text_ar' })
-    contentAr: string | null;
+    content_ar: string | null;
+
+    @Column({ type: 'varchar', length: 1024, nullable: true })
+    @ApiProperty({ description: 'Image file path (relative to project root)', required: false })
+    imagePath: string | null;
 }

@@ -19,9 +19,6 @@ export class SettingsService {
         if (!settings) {
             // create default values if none exist
             settings = this.settingsRepo.create({
-                vision: null,
-                goals: null,
-                missions: null,
                 privacyPolicy: null,
                 termsOfService: null,
                 platformPercent: 2.5,

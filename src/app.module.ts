@@ -14,6 +14,9 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { SeedModule } from './database/seeds/seed.module';
 import { CompanyInfoModule } from './modules/companyInfo/companyInfo.module';
+import { SwaggerSyncModule } from 'nestjs-swagger-sync';
+import { DepartmentsModule } from './modules/departments/departments.module';
+import { TeamsModule } from './modules/teams/teams.module';
 
 @Module({
   imports: [
@@ -45,13 +48,22 @@ import { CompanyInfoModule } from './modules/companyInfo/companyInfo.module';
     CacheModule.register({
       isGlobal: true,
     }),
+    SwaggerSyncModule.register({
+      apiKey: 'PMAK-69317999c435a500014aec2a-2b9a9fbe3ddf8ddb28efec4fd44cc89cab',
+      swaggerPath: 'api/docs',
+      baseUrl: 'http://localhost:8081',
+      collectionName: "backend",
+      runTest: false
+    }),
     SeedModule,
     UsersModule,
     AuthModule,
     SessionsModule,
     EmailModule,
     SettingsModule,
-    CompanyInfoModule
+    CompanyInfoModule,
+    DepartmentsModule,
+    TeamsModule
   ],
   controllers: [AppController, AuthController],
   providers: [CustomValidationPipe],

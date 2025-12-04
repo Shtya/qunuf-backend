@@ -6,6 +6,7 @@ import { CustomValidationPipe } from './common/pipes/customValidation.pipe';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -30,6 +31,7 @@ async function bootstrap() {
 
 
   app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useStaticAssets(join(__dirname, '..', '/uploads'), { prefix: '/uploads/' });
 
   const customValidationPipe = app.get(CustomValidationPipe);
   app.useGlobalPipes(customValidationPipe);

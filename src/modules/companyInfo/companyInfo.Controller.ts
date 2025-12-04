@@ -1,6 +1,10 @@
-import { Controller, Get, Post, Put, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { CompanyInfoService } from './companyInfo.service';
-import { CompanyInfo, CompanySection } from 'src/common/entities/companyInfo.entity';
+import { CompanyInfo } from 'src/common/entities/companyInfo.entity';
+import { CreateCompanyInfoDto } from './dto/create-company-info.dto';
+import { UpdateCompanyInfoDto } from './dto/update-company-info.dto';
+import { imageUploadConfig } from 'src/common/utils/file.util';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('company-info')
 export class CompanyInfoController {
@@ -11,23 +15,35 @@ export class CompanyInfoController {
         return this.companyInfoService.getAll();
     }
 
-    @Get(':section')
-    async getBySection(@Param('section') section: CompanySection): Promise<CompanyInfo | null> {
-        return this.companyInfoService.getBySection(section);
+    @Get(':id')
+    async getBySection(@Param('id') id: string) {
+        return this.companyInfoService.getBySection(id);
     }
 
     @Post()
-    async addInfo(@Body() data: Partial<CompanyInfo>): Promise<CompanyInfo> {
-        return this.companyInfoService.addInfo(data);
+    @UseInterceptors(FileInterceptor('image', imageUploadConfig('company-info')))
+    async addInfo(@UploadedFile() file: any, @Body() dto: CreateCompanyInfoDto): Promise<CompanyInfo> {
+        const imagePath = file ? file.path : undefined;
+
+        return this.companyInfoService.addInfo(dto, imagePath);
     }
 
     @Put(':id')
-    async updateInfo(@Param('id') id: string, @Body() data: Partial<CompanyInfo>): Promise<CompanyInfo | null> {
-        return this.companyInfoService.updateInfo(id, data);
+    @UseInterceptors(FileInterceptor('image', imageUploadConfig('company-info')))
+    async updateInfo(
+        @UploadedFile() file: any,
+        @Param('id') id: string,
+        @Body() dto: UpdateCompanyInfoDto
+    ): Promise<CompanyInfo | null> {
+        const imagePath = file ? file.path : undefined;
+        return this.companyInfoService.updateInfo(id, dto, imagePath);
     }
 
+
     @Delete(':id')
-    async deleteInfo(@Param('id') id: string): Promise<void> {
+    async deleteInfo(@Param('id') id: string) {
         return this.companyInfoService.deleteInfo(id);
     }
 }
+
+
