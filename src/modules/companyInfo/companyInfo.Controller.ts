@@ -12,7 +12,7 @@ export class CompanyInfoController {
     constructor(private readonly companyInfoService: CompanyInfoService) { }
 
     @Get()
-    async getAll(): Promise<CompanyInfo[]> {
+    async getAll() {
         return this.companyInfoService.getAll();
     }
 
@@ -34,7 +34,7 @@ export class CompanyInfoController {
     async addInfo(
         @UploadedFile() file: any,
         @Body() dto: CreateCompanyInfoDto,
-    ): Promise<CompanyInfo> {
+    ) {
         let path = '';
         if (file) {
             path = `uploads/images/company-info/${file.filename}`;
@@ -48,7 +48,7 @@ export class CompanyInfoController {
         @UploadedFile() file: any,
         @Param('id') id: string,
         @Body() dto: UpdateCompanyInfoDto
-    ): Promise<CompanyInfo | null> {
+    ) {
         let path: string = '';
         if (file) {
             path = `uploads/images/company-info/${file.filename}`;

@@ -4,38 +4,25 @@ import {
     ExecutionContext,
     CallHandler,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, map } from 'rxjs';
+import { Result } from '../utils/Result';
+
 
 @Injectable()
-export class ResponseInterceptor<T> implements NestInterceptor<T, any> {
-    intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+export class ResponseInterceptor<T> implements NestInterceptor<T, Result<T>> {
+    intercept(context: ExecutionContext, next: CallHandler): Observable<Result<T>> {
         return next.handle().pipe(
             map((data) => {
-                const statusCode = context.switchToHttp().getResponse().statusCode;
-
-                // If data is an object with "message" and "data" keys, use them directly
-                if (
-                    data &&
-                    typeof data === 'object' &&
-                    ('message' in data ||
-                        'data' in data)
-                ) {
-                    return {
-                        data: data?.data || null,
-                        message: data?.message || 'Success',
-                        errors: data.errors ?? null,
-                        statusCode,
-                    };
+                // If already a Result instance, just return it
+                if (data instanceof Result) {
+                    // Optionally, also sync HTTP status code with Result.statusCode
+                    const response = context.switchToHttp().getResponse();
+                    response.statusCode = data.statusCode;
+                    return data;
                 }
 
-                // Otherwise, wrap the raw data
-                return {
-                    data,
-                    message: 'Success',
-                    errors: null,
-                    statusCode,
-                };
+
+                return Result.ok(data, 'Success', 200);
             }),
         );
     }

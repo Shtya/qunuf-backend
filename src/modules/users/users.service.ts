@@ -5,74 +5,85 @@ import { User, UserStatus } from '../../common/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { Result } from 'src/common/utils/Result';
+
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
-
   ) { }
 
-  async validateUser(email: string, password: string): Promise<User> {
+  async validateUser(email: string, password: string) {
     // 1. Find user by email
     const user = await this.userRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'passwordHash', 'status', 'role'], // explicitly include passwordHash
+      select: ['id', 'email', 'passwordHash', 'status', 'role'], // include passwordHash
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      return Result.unauthorized('Invalid credentials');
     }
 
     // 2. Compare provided password with stored hash
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+      return Result.unauthorized('Invalid credentials');
     }
 
     // 3. Return user if valid
-    return user;
+    return Result.ok(user, 'User validated successfully');
   }
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto) {
     const existingUser = await this.userRepository.findOne({
       where: { email: createUserDto.email },
     });
 
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      return Result.conflict('Email already exists');
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
-    // Create a new User entity instance
     const user = this.userRepository.create({
       email: createUserDto.email,
       name: createUserDto.name,
       passwordHash: hashedPassword,
-      status: UserStatus.PENDING_VERIFICATION, // set default status
-      role: createUserDto.role
+      status: UserStatus.PENDING_VERIFICATION, // default status
+      role: createUserDto.role,
     });
 
-    // Save it to the database
-    return await this.userRepository.save(user);
+    const saved = await this.userRepository.save(user);
+    return Result.created(saved, 'User created successfully');
   }
 
   async findAll() {
-    return this.userRepository.find();
+    const users = await this.userRepository.find();
+    return Result.ok(users, 'Users fetched successfully');
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findOne(id: string) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) return Result.notFound('User not found');
+    return Result.ok(user, 'User fetched successfully');
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) return Result.notFound('User not found');
+
+    const merged = this.userRepository.merge(user, updateUserDto);
+    const updated = await this.userRepository.save(merged);
+    return Result.ok(updated, 'User updated successfully');
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) return Result.notFound('User not found');
+
     await this.userRepository.delete(id);
+    return Result.ok(null, 'User deleted successfully');
   }
-
 }

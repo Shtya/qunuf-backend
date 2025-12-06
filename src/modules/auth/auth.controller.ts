@@ -37,7 +37,14 @@ export class AuthController {
     @Get('verify-email')
     async verify(@Query('code') code: string, @Query('email') email: string, @Res() res: Response) {
         const result = await this.authService.verify(code, email);
-        return res.redirect(result.redirectUrl);
+        // Check if result is OK before redirecting
+        if (!result.isOk) {
+            return result;
+        }
+
+        // Access redirectUrl from Result.data
+        const redirectUrl = (result.data as { redirectUrl: string }).redirectUrl;
+        return res.redirect(redirectUrl);
     }
 
     @Post('forgot-password')

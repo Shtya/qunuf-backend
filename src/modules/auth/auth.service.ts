@@ -12,7 +12,8 @@ import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import { EmailService } from '../email/email.service';
 import { v4 as uuidv4 } from 'uuid';
-
+import { Session } from "src/common/entities/session.entity";
+import { Result } from "src/common/utils/Result";
 export interface JwtPayload {
     sub: string;
     sid: string;
@@ -39,76 +40,75 @@ export class AuthService {
     RESET_EXPIRE_HOURS = 1; // reset token valid for 1 hour
 
     async login(loginDto: LoginDto, req: Request) {
-        const user = await this.usersService.validateUser(loginDto.email, loginDto.password)
-        if (!user) {
-            throw new UnauthorizedException('Incorrect email or password');
+        // 1) Validate user credentials
+        const result = await this.usersService.validateUser(loginDto.email, loginDto.password);
+        if (!result.isOk) return result;
+
+        const user = result.data as User;
+
+        // 2) Check user status
+        switch (user.status) {
+            case UserStatus.INACTIVE:
+            case UserStatus.DELETED:
+                return Result.unauthorized('Your account is inactive. Please contact support.');
+            case UserStatus.SUSPENDED:
+                return Result.unauthorized('Your account has been suspended. Please contact support.');
+            case UserStatus.PENDING_VERIFICATION:
+                return Result.unauthorized('Please verify your email before logging in.');
         }
 
-        if (user.status === UserStatus.INACTIVE || user.status === UserStatus.DELETED) {
-            throw new UnauthorizedException('Your account is inactive. Please contact support.');
-        }
-
-        if (user.status === UserStatus.SUSPENDED) {
-            throw new UnauthorizedException('Your account has been suspended. Please contact support.');
-        }
-
-        if (user.status === UserStatus.PENDING_VERIFICATION) {
-            throw new UnauthorizedException('Please verify your email before logging in');
-        }
-
-
+        // 3) Update last login
         user.lastLogin = new Date();
-        // 1) create a new DB session
-        const session = await this.sessionsService.createSession(user.id, req);
 
+        // 4) Create a new DB session
+        const sessionResult = await this.sessionsService.createSession(user.id, req);
+        if (!sessionResult.isOk) return sessionResult;
+
+        const session = sessionResult.data as Session;
+
+        // 5) Sign tokens
         const { accessToken, refreshToken } = this.signTokens(user, session.id);
 
-        await this.userRepository.save(user)
+        await this.userRepository.save(user);
 
-
-        // 3) store refresh token hash on the session (for rotation & revocation)
+        // 6) Store refresh token hash for rotation & revocation
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
         await this.sessionsService.updateRefreshTokenHash(session.id, refreshTokenHash);
 
-
-        return {
-            accessToken,
-            refreshToken,
-            user: {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                status: user.status,
-                lastLogin: user.lastLogin,
-            }
-        };
-
+        return Result.ok(
+            {
+                accessToken,
+                refreshToken,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    role: user.role,
+                    status: user.status,
+                    lastLogin: user.lastLogin,
+                },
+            },
+            'Login successful'
+        );
     }
 
     async register(createUserDto: any, req: Request) {
-        // create user with UsersService to ensure validations/hashing
         const { name, email, password, role } = createUserDto;
 
-        const existingUser = await this.userRepository.findOne({
-            where: [
-                { email: email },
-            ],
-        });
+        // 1) Prevent duplicate emails
+        const existingUser = await this.userRepository.findOne({ where: { email } });
+        if (existingUser) return Result.conflict('Email already exists');
 
-        if (existingUser) {
-            throw new ConflictException('Email already exists');
-        }
+        // 2) Prevent self-assigning admin role
+        if (role === UserRole.ADMIN) return Result.forbidden('You cannot assign yourself as admin');
 
-        if (role === UserRole.ADMIN) {
-            throw new ConflictException('You cannot assign yourself as admin');
-        }
+        // 3) Create user
+        const result = await this.usersService.create({ name, email, password, role });
+        if (!result.isOk) return result;
 
-        const user = await this.usersService.create({
-            name, email, password, role
-        });
+        const user = result.data as User;
 
-        // generate verification code
+        // 4) Generate email verification code
         const code = uuidv4();
         const now = new Date();
         const expires = new Date(now.getTime() + this.CODE_EXPIRE * 60 * 60 * 1000); // 24 hours
@@ -120,13 +120,13 @@ export class AuthService {
 
         await this.userRepository.save(user);
 
-        // build verification link
+        // 5) Build verification link
         const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:8081');
         const link = `${appUrl}/api/v1/auth/verify-email?code=${code}&email=${user.email}`;
 
         await this.emailService.sendVerificationEmail(user.email, link);
 
-        return { message: 'User registered. Verification email sent.' };
+        return Result.created({ email: user.email }, 'User registered. Verification email sent.');
     }
 
 
@@ -143,28 +143,25 @@ export class AuthService {
             ],
         });
 
+        // Always return generic message to prevent enumeration
         if (!user) {
-            return { message: 'If the email is registered, a verification email has been resent.' };
+            return Result.ok(null, 'If the email is registered, a verification email has been resent.');
         }
 
         if (user.status === UserStatus.ACTIVE) {
-            return { message: 'This account is already verified.' };
+            return Result.ok(null, 'This account is already verified.');
         }
-
 
         const now = new Date();
 
-        // ⏱ Prevent resend within RESEND_TIME seconds
+        // Prevent resend within RESEND_TIME seconds
         if (
             user.emailVerificationSentAt &&
             now.getTime() - user.emailVerificationSentAt.getTime() < this.RESEND_TIME * 1000
         ) {
             const elapsed = (now.getTime() - user.emailVerificationSentAt.getTime()) / 1000;
             const remaining = Math.ceil(this.RESEND_TIME - elapsed);
-
-            throw new BadRequestException(
-                `Please wait ${remaining} seconds before requesting another verification email`,
-            );
+            return Result.badRequest(`Please wait ${remaining} seconds before requesting another verification email`);
         }
 
         const code = uuidv4();
@@ -181,14 +178,14 @@ export class AuthService {
 
         await this.emailService.sendVerificationEmail(user.email, link);
 
-        return { message: 'If the email is registered, Verification email resent' };
+        return Result.ok(null, 'If the email is registered, verification email resent');
     }
 
     async forgotPassword(email: string) {
         if (!email) {
-            throw new BadRequestException('Email is required');
+            return Result.badRequest('Email is required');
         }
-        // find active user
+
         const user = await this.userRepository.findOne({
             where: { email },
             select: [
@@ -201,13 +198,13 @@ export class AuthService {
             ],
         });
 
+        // Always return generic message to prevent user enumeration
         if (!user) {
-            // don't reveal whether user exists
-            return { message: 'If the email is registered, a reset link has been sent' };
+            return Result.ok(null, 'If the email is registered, a reset link has been sent');
         }
 
         if (user.status !== UserStatus.ACTIVE) {
-            throw new BadRequestException('Only active users can reset password');
+            return Result.badRequest('Only active users can reset password');
         }
 
         const now = new Date();
@@ -220,9 +217,7 @@ export class AuthService {
             const elapsed = (now.getTime() - user.lastResetPasswordSentAt.getTime()) / 1000;
             const remaining = Math.ceil(this.RESEND_TIME - elapsed);
 
-            throw new BadRequestException(
-                `Please wait ${remaining} seconds before requesting another reset email`,
-            );
+            return Result.badRequest(`Please wait ${remaining} seconds before requesting another reset email`);
         }
 
         const code = uuidv4();
@@ -239,8 +234,9 @@ export class AuthService {
 
         await this.emailService.sendResetPasswordEmail(user.email, resetLink);
 
-        return { message: 'If the email is registered, a reset link has been sent' };
+        return Result.ok(null, 'If the email is registered, a reset link has been sent');
     }
+
 
     async resetPassword(email: string, code: string, newPassword: string) {
         const user = await this.userRepository.findOne({
@@ -254,37 +250,32 @@ export class AuthService {
             ],
         });
 
-        if (!user) {
-            throw new BadRequestException('Invalid reset code or email');
-        }
-
-        if (user.resetPasswordToken !== code) {
-            throw new BadRequestException('Invalid reset code or email');
+        if (!user || user.resetPasswordToken !== code) {
+            return Result.badRequest('Invalid reset code or email');
         }
 
         if (user.resetPasswordExpires && user.resetPasswordExpires < new Date()) {
-            throw new BadRequestException('Reset code expired');
+            return Result.badRequest('Reset code expired');
         }
 
-        // update password
+        // Update password
         const hashed = await bcrypt.hash(newPassword, 10);
         (user as any).passwordHash = hashed;
 
-        // clear reset fields
+        // Clear reset fields
         user.resetPasswordToken = null;
         user.lastResetPasswordSentAt = null;
         user.resetPasswordExpires = null;
 
         await this.userRepository.save(user);
 
-        // notify user
+        // Notify user
         await this.emailService.sendPasswordChangedEmail(user.email);
 
-        return { message: 'Password changed successfully' };
+        return Result.ok(null, 'Password changed successfully');
     }
 
     async verify(code: string, email: string) {
-        // Explicitly select hidden fields
         const user = await this.userRepository.findOne({
             where: { email },
             select: [
@@ -297,22 +288,15 @@ export class AuthService {
             ],
         });
 
-        if (!user) {
-            throw new UnauthorizedException('Invalid verification code');
+        if (!user || user.emailVerificationCode !== code) {
+            return Result.unauthorized('Invalid verification code');
         }
 
-        if (user.emailVerificationCode !== code) {
-            throw new UnauthorizedException('Invalid verification code');
+        if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
+            return Result.unauthorized('Verification code expired');
         }
 
-        if (
-            user.emailVerificationExpires &&
-            user.emailVerificationExpires < new Date()
-        ) {
-            throw new UnauthorizedException('Verification code expired');
-        }
-
-        // ✅ Mark user as verified
+        // Mark user as verified
         user.status = UserStatus.ACTIVE;
         user.emailVerificationCode = null;
         user.emailVerificationSentAt = null;
@@ -323,8 +307,9 @@ export class AuthService {
         const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
         const redirectUrl = `${frontendUrl}/auth/sign-in`;
 
-        return { message: 'Email verified successfully', redirectUrl };
+        return Result.ok({ redirectUrl }, 'Email verified successfully');
     }
+
 
     private signTokens(user: User, sessionId: string) {
         const accessToken = this.jwtService.sign(
@@ -354,10 +339,15 @@ export class AuthService {
         return { accessToken, refreshToken };
     }
 
+    private generateOTP() {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        return otp
+    }
+
     async refresh(providedRefreshToken: string | undefined, req: Request) {
         const token = providedRefreshToken || (req.cookies && (req.cookies as any).refresh_token);
         if (!token) {
-            throw new UnauthorizedException('Refresh token not provided');
+            return Result.unauthorized('Refresh token not provided');
         }
 
         let payload: any;
@@ -366,67 +356,75 @@ export class AuthService {
                 secret: this.configService.get<string>('JWT_REFRESH_SECRET', ''),
             });
         } catch (e) {
-            throw new UnauthorizedException('Invalid refresh token');
+            return Result.unauthorized('Invalid refresh token');
         }
 
-        const session = await this.sessionsService.getSession(payload.sid);
+        // 1) Get session
+        const sessionResult = await this.sessionsService.getSession(payload.sid);
+        if (!sessionResult.isOk) return sessionResult;
+        const session = sessionResult.data as Session;
+
         if (!session) {
-            throw new UnauthorizedException('Session not found or revoked');
+            return Result.unauthorized('Session not found or revoked');
         }
 
+        // 2) Validate refresh token hash
         const isValid = await bcrypt.compare(token, session.refreshTokenHash || '');
         if (!isValid) {
-            throw new UnauthorizedException('Refresh token revoked');
+            return Result.unauthorized('Refresh token revoked');
         }
 
+        // 3) Get user
         const user = await this.userRepository.findOne({ where: { id: payload.sub } });
         if (!user) {
-            throw new UnauthorizedException('User not found');
+            return Result.notFound('User not found');
         }
 
-        // rotate tokens
+        // 4) Rotate tokens
         const { accessToken, refreshToken } = this.signTokens(user, session.id);
         const newHash = await bcrypt.hash(refreshToken, 10);
         await this.sessionsService.updateRefreshTokenHash(session.id, newHash);
 
-        return { accessToken, refreshToken, user };
+        return Result.ok(
+            { accessToken, refreshToken, user },
+            'Tokens refreshed successfully'
+        );
     }
 
-    private generateOTP() {
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        return otp
-    }
+
+
 
     async logout(userId: string, sessionId: string) {
-        await this.sessionsService.revokeSession(sessionId);
-        return { message: 'Logged out successfully' };
+        const revokeResult = await this.sessionsService.revokeSession(sessionId);
+        if (!revokeResult.isOk) return revokeResult;
+
+        return Result.ok(null, 'Logged out successfully');
     }
 
     async logoutAll(userId: string) {
-        await this.sessionsService.revokeAllUserSessions(userId);
-        return { message: 'Logged out from all sessions' };
+        const revokeResult = await this.sessionsService.revokeAllUserSessions(userId);
+        if (!revokeResult.isOk) return revokeResult;
+
+        return Result.ok(null, 'Logged out from all sessions');
     }
 
-
     // Get current user by ID
-    async getCurrentUser(userId: string): Promise<User> {
+    async getCurrentUser(userId: string) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-        return user;
+        if (!user) return Result.notFound('User not found');
+
+        return Result.ok(user, 'Current user fetched successfully');
     }
 
     // Deactivate account (set status to INACTIVE)
-    async deactivateAccount(userId: string): Promise<{ message: string }> {
+    async deactivateAccount(userId: string) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+        if (!user) return Result.notFound('User not found');
 
         user.status = UserStatus.INACTIVE;
         await this.userRepository.save(user);
 
-        return { message: 'Account deactivated successfully' };
+        return Result.ok(null, 'Account deactivated successfully');
     }
+
 }
