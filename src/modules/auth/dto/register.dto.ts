@@ -1,21 +1,25 @@
-import { Type } from 'class-transformer';
-import { IsString, IsEmail, MinLength, MaxLength, Matches, IsNotEmpty, ValidateNested, Max, IsIn } from 'class-validator';
+import { IsEmail, IsString, IsNotEmpty, MaxLength, MinLength, Matches, IsIn } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from 'src/common/entities/user.entity';
 
-
-const allowedRoles = [UserRole.TENANT, UserRole.LANDLORD] as const;
-
-
 export class registerDto {
+    @ApiProperty({ example: 'John Doe', description: 'Full name of the user', maxLength: 50 })
     @IsString()
     @IsNotEmpty({ message: 'Name is required' })
     @MaxLength(50, { message: 'Name must be at most 50 characters long' })
     name: string;
 
+    @ApiProperty({ example: 'user@example.com', description: 'User email address' })
     @IsEmail({}, { message: 'Email must be a valid email address' })
     @IsNotEmpty({ message: 'Email is required' })
     email: string;
 
+    @ApiProperty({
+        example: 'Password123!',
+        description: 'Password (8-20 chars, must contain uppercase, lowercase, number, special char)',
+        minLength: 8,
+        maxLength: 20,
+    })
     @IsString()
     @IsNotEmpty({ message: 'Password is required' })
     @MinLength(8, { message: 'Password must be at least 8 characters long' })
@@ -26,7 +30,7 @@ export class registerDto {
     })
     password: string;
 
-
-    @IsIn(allowedRoles, { message: 'Role must be either TENANT or LANDLORD' })
+    @ApiProperty({ example: 'TENANT', description: 'Role of the user', enum: UserRole })
+    @IsIn(['TENANT', 'LANDLORD'], { message: 'Role must be either TENANT or LANDLORD' })
     role: UserRole;
 }

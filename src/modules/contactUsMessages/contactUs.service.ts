@@ -2,8 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Repository, ILike } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ContactUsMessage } from 'src/common/entities/contact_us_messages';
-import { CreateContactUsDto } from './create-contact-us-dto';
 import { Result } from 'src/common/utils/Result';
+import { CreateContactUsDto } from './dto/create-contact-us-dto';
 
 
 @Injectable()

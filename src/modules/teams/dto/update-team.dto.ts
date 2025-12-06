@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateTeamDto {
     @ApiProperty({ maxLength: 255 })
@@ -35,4 +35,8 @@ export class UpdateTeamDto {
     @MaxLength(255)
     @IsNotEmpty()
     email: string;
+
+    @ApiProperty({ type: 'string', format: 'binary', required: false })
+    @IsOptional()
+    image?: any;
 }

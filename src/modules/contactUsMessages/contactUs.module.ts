@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContactUsMessage } from 'src/common/entities/contact_us_messages';
-import { ContactUsService } from './contactUs.service';
 import { ContactUsController } from './contactUs.controller';
+import { ContactUsService } from './contactUs.service';
 
 @Module({
     imports: [TypeOrmModule.forFeature([ContactUsMessage])],

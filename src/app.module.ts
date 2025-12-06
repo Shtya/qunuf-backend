@@ -17,7 +17,7 @@ import { CompanyInfoModule } from './modules/companyInfo/companyInfo.module';
 import { SwaggerSyncModule } from 'nestjs-swagger-sync';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { TeamsModule } from './modules/teams/teams.module';
-import { ContactUsModule } from './modules/contactUsMessages/dto/contactUs.module';
+import { ContactUsModule } from './modules/contactUsMessages/contactUs.module';
 
 @Module({
   imports: [

@@ -14,13 +14,17 @@ export class CreateDepartmentDto {
     @IsNotEmpty()
     title_en: string;
 
-    @ApiProperty({ description: 'Description in Arabic', required: false })
-    @IsOptional()
+    @ApiProperty({ description: 'Description in Arabic', required: true })
+    @IsNotEmpty()
     @IsString()
-    description_ar?: string;
+    description_ar: string;
 
-    @ApiProperty({ description: 'Description in English', required: false })
-    @IsOptional()
+    @ApiProperty({ description: 'Description in English', required: true })
+    @IsNotEmpty()
     @IsString()
-    description_en?: string;
+    description_en: string;
+
+    @ApiProperty({ type: 'string', format: 'binary', required: false })
+    @IsOptional()
+    image?: any;
 }

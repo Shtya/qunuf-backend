@@ -19,4 +19,8 @@ export class UpdateDepartmentDto {
     @ApiProperty({ description: 'Description in English' })
     @IsString()
     description_en: string;
+
+    @ApiProperty({ type: 'string', format: 'binary', required: false })
+    @IsOptional()
+    image?: any;
 }

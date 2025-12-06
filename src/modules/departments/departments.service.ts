@@ -6,6 +6,8 @@ import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
 import { deleteFile } from 'src/common/utils/file.util';
 import { Result } from 'src/common/utils/Result';
+
+
 @Injectable()
 export class DepartmentsService {
     constructor(

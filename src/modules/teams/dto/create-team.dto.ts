@@ -35,4 +35,8 @@ export class CreateTeamDto {
     @MaxLength(255)
     @IsNotEmpty()
     email: string;
+
+    @ApiProperty({ type: 'string', format: 'binary', required: false })
+    @IsOptional()
+    image?: any;
 }
