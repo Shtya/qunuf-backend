@@ -10,6 +10,7 @@ import {
     UseInterceptors,
     Req,
     BadRequestException,
+    Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TeamsService } from './teams.service';
@@ -24,9 +25,17 @@ import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 export class TeamsController {
     constructor(private readonly svc: TeamsService) { }
 
+
     @Get()
-    list() {
-        return this.svc.findAll();
+    list(
+        @Query('page') page = 1,
+        @Query('limit') limit = 15
+    ) {
+        page = Number(page);
+        limit = Number(limit);
+
+        const data = this.svc.findAll(page, limit);
+        return data
     }
 
     @Get(':id')
@@ -39,18 +48,23 @@ export class TeamsController {
     @ApiBody({ type: CreateTeamDto })
     @UseInterceptors(FileInterceptor('image', imageUploadConfig('teams')))
     async create(@UploadedFile() file: any, @Body() dto: CreateTeamDto, @Req() req: any) {
-        const imagePath = file ? file.path : undefined;
-        if (!imagePath) throw new BadRequestException('No image uploaded');
-        return this.svc.create(dto, imagePath);
+        let path = '';
+        if (file) {
+            path = `uploads/images/teams/${file.filename}`;
+        }
+        return this.svc.create(dto, path);
     }
 
     @Put(':id')
     @ApiConsumes('multipart/form-data')
     @UseInterceptors(FileInterceptor('image', imageUploadConfig('teams')))
     async update(@Param('id') id: string, @UploadedFile() file: any, @Body() dto: UpdateTeamDto) {
-        const imagePath = file ? file.path : undefined;
-        if (!imagePath) throw new BadRequestException('No image uploaded');
-        return this.svc.update(id, dto, imagePath);
+        let path = '';
+        if (file) {
+            path = `uploads/images/teams/${file.filename}`;
+        }
+
+        return this.svc.update(id, dto, path);
     }
 
     @Delete(':id')

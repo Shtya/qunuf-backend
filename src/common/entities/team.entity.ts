@@ -20,7 +20,15 @@ export class TeamMember extends CoreEntity {
     @ApiProperty({ description: 'Description in English', required: true })
     description_en: string | null;
 
-    @Column({ type: 'varchar', length: 1024 })
+    @Column({ type: 'varchar', length: 1024, nullable: true })
     @ApiProperty({ description: 'Image path', required: true })
-    imagePath: string | null;
+    imagePath?: string | null;
+
+    @Column({ length: 50 })
+    @ApiProperty({ description: 'Phone number', required: true })
+    phone: string;
+
+    @Column({ length: 255 })
+    @ApiProperty({ description: 'Email address', required: true })
+    email: string;
 }

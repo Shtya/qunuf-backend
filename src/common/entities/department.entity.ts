@@ -20,7 +20,7 @@ export class Department extends CoreEntity {
     @ApiProperty({ description: 'Description in English', required: true })
     description_en: string;
 
-    @Column({ type: 'varchar', length: 1024 })
-    @ApiProperty({ description: 'Image file path (relative to project root)', required: true })
-    imagePath: string;
+    @Column({ type: 'varchar', length: 1024, nullable: true })
+    @ApiProperty({ description: 'Image file path (relative to project root)', required: false })
+    imagePath: string | null;
 }

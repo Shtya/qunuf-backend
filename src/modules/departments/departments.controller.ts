@@ -11,6 +11,7 @@ import {
     UseGuards,
     Req,
     BadRequestException,
+    Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { imageUploadConfig } from 'src/common/utils/file.util';
@@ -25,8 +26,15 @@ export class DepartmentsController {
     constructor(private readonly svc: DepartmentsService) { }
 
     @Get()
-    list() {
-        return this.svc.findAll();
+    list(
+        @Query('page') page = 1,
+        @Query('limit') limit = 15
+    ) {
+        page = Number(page);
+        limit = Number(limit);
+
+        const data = this.svc.findAll(page, limit);
+        return data
     }
 
     @Get(':id')
@@ -39,11 +47,11 @@ export class DepartmentsController {
     @ApiBody({ type: CreateDepartmentDto })
     @UseInterceptors(FileInterceptor('image', imageUploadConfig('departments')))
     async create(@UploadedFile() file: any, @Body() dto: CreateDepartmentDto, @Req() req: any) {
-        const imagePath = file ? file.path : undefined;
-        if (!imagePath) {
-            throw new BadRequestException("No image uploaded")
+        let path = '';
+        if (file) {
+            path = `uploads/images/departments/${file.filename}`;
         }
-        return this.svc.create(dto, imagePath);
+        return this.svc.create(dto, path);
     }
 
     @Put(':id')
@@ -54,11 +62,12 @@ export class DepartmentsController {
         @UploadedFile() file: any,
         @Body() dto: UpdateDepartmentDto,
     ) {
-        const imagePath = file ? file.path : undefined;
-        if (!imagePath) {
-            throw new BadRequestException("No image uploaded")
+        let path = '';
+        if (file) {
+            path = `uploads/images/departments/${file.filename}`;
         }
-        return this.svc.update(id, dto, imagePath);
+
+        return this.svc.update(id, dto, path);
     }
 
     @Delete(':id')

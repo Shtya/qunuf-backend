@@ -7,28 +7,33 @@ export class SectionParamDto {
     @IsEnum(CompanySection)
     section: string;
 }
+;
 
 export class CreateCompanyInfoDto {
-
+    @ApiProperty({ enum: CompanySection, description: 'Section of the company info' })
     @IsEnum(CompanySection)
     @IsNotEmpty()
-    sectionKey: string;
+    section: string;
 
+    @ApiProperty({ maxLength: 255, description: 'Arabic title of the company info' })
     @IsString()
     @MaxLength(255)
     @IsNotEmpty()
     title_ar: string;
 
+    @ApiProperty({ maxLength: 255, description: 'English title of the company info' })
     @IsString()
     @MaxLength(255)
     @IsNotEmpty()
     title_en: string;
 
-    @IsOptional()
+    @ApiProperty({ description: 'English content of the company info' })
+    @IsNotEmpty()
     @IsString()
-    content_en?: string;
+    content_en: string;
 
-    @IsOptional()
+    @ApiProperty({ description: 'Arabic content of the company info' })
+    @IsNotEmpty()
     @IsString()
-    content_ar?: string;
+    content_ar: string;
 }

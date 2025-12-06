@@ -45,41 +45,47 @@ export const PROPERTY_TYPES = [
 ];
 
 
+
 export const COMPANY_SECTIONS: Partial<CompanyInfo>[] = [
     {
         section: CompanySection.MISSION,
         title_en: 'Our Mission',
         title_ar: 'مهمتنا',
         content_en: `At the core of our mission is the optimization of your time, physical vitality, and mental energy, enabling you to concentrate more effectively on your objectives and excel in your professional endeavors.`,
-        content_ar: `في صميم مهمتنا هو تحسين وقتك، صحتك البدنية والعقلية، مما يمكنك من التركيز على أهدافك وتحقيق التفوق في مهامك المهنية.`
+        content_ar: `في صميم مهمتنا هو تحسين وقتك، صحتك البدنية والعقلية، مما يمكنك من التركيز على أهدافك وتحقيق التفوق في مهامك المهنية.`,
+        imagePath: "/uploads/images/company-info/mission.jpg",
     },
     {
         section: CompanySection.VISION,
         title_en: 'Our Vision',
         title_ar: 'رؤيتنا',
         content_en: `At the core of our vision is the optimization of your time, physical vitality, and mental energy, enabling you to concentrate more effectively on your objectives and excel in your professional endeavors.`,
-        content_ar: `في صميم رؤيتنا هو تحسين وقتك، صحتك البدنية والعقلية، مما يمكنك من التركيز على أهدافك وتحقيق التفوق في مهامك المهنية.`
+        content_ar: `في صميم رؤيتنا هو تحسين وقتك، صحتك البدنية والعقلية، مما يمكنك من التركيز على أهدافك وتحقيق التفوق في مهامك المهنية.`,
+        imagePath: "/uploads/images/company-info/vision.jpg",
     },
     {
         section: CompanySection.GOALS,
         title_en: 'Our Goals',
         title_ar: 'أهدافنا',
         content_en: `At the core of our goals is the optimization of your time, physical vitality, and mental energy, enabling you to concentrate more effectively on your objectives and excel in your professional endeavors.`,
-        content_ar: `في صميم أهدافنا هو تحسين وقتك، صحتك البدنية والعقلية، مما يمكنك من التركيز على أهدافك وتحقيق التفوق في مهامك المهنية.`
+        content_ar: `في صميم أهدافنا هو تحسين وقتك، صحتك البدنية والعقلية، مما يمكنك من التركيز على أهدافك وتحقيق التفوق في مهامك المهنية.`,
+        imagePath: "/uploads/images/company-info/goals.jpg",
     },
     {
         section: CompanySection.HISTORY,
         title_en: 'History of Qunuf',
         title_ar: 'تاريخ قنف',
         content_en: `Lorem ipsum dolor sit amet, consectetur adipisicing elit. Doloremque assumenda incidunt id cum. Fugiat repellat cumque delectus, at ipsum ad iure explicabo perferendis. If you're still reading this, congrats, you're officially a masochist.`,
-        content_ar: `لوريم ايبسوم دولار سيت أميت، كونسيكتيتور أديبيسيسينغ إليت. دولوريمك أسسومندا إينسيدونت إد كوم. فوجيات ريبيلات كومكي ديليكتوس، في إيبسوم آد يور إكسبليكاتيو بيرفيرينديس. إذا كنت لا تزال تقرأ هذا، تهانينا، أنت رسميًا متحمس للتحدي.`
+        content_ar: `لوريم ايبسوم دولار سيت أميت، كونسيكتيتور أديبيسيسينغ إليت. دولوريمك أسسومندا إينسيدونت إد كوم. فوجيات ريبيلات كومكي ديليكتوس، في إيبسوم آد يور إكسبليكاتيو بيرفيرينديس. إذا كنت لا تزال تقرأ هذا، تهانينا، أنت رسميًا متحمس للتحدي.`,
+        imagePath: "/uploads/images/company-info/History.jpg",
     },
     {
         section: CompanySection.WHY_US,
         title_en: 'Why Qunuf',
         title_ar: 'لماذا قنف',
         content_en: `Lorem ipsum dolor sit amet, consectetur adipisicing elit. Doloremque assumenda incidunt id cum. Fugiat repellat cumque delectus, at ipsum ad iure explicabo perferendis.`,
-        content_ar: `لوريم ايبسوم دولار سيت أميت، كونسيكتيتور أديبيسيسينغ إليت. دولوريمك أسسومندا إينسيدونت إد كوم. فوجيات ريبيلات كومكي ديليكتوس، في إيبسوم آد يور إكسبليكاتيو بيرفيرينديس.`
+        content_ar: `لوريم ايبسوم دولار سيت أميت، كونسيكتيتور أديبيسيسينغ إليت. دولوريمك أسسومندا إينسيدونت إد كوم. فوجيات ريبيلات كومكي ديليكتوس، في إيبسوم آد يور إكسبليكاتيو بيرفيرينديس.`,
+        imagePath: "/uploads/images/company-info/Why.jpg",
     }
 ];
 

@@ -13,8 +13,27 @@ export class DepartmentsService {
         private readonly repo: Repository<Department>,
     ) { }
 
-    findAll() {
-        return this.repo.find();
+    async findAll(page: number, limit: number) {
+        const take = limit ?? 15;
+        const skip = (page - 1) * limit;
+
+        const [records, total] = await this.repo.findAndCount({
+            skip,
+            take,
+            order: { created_at: 'ASC' }, // optional
+        });
+
+        const totalPages = Math.ceil(total / limit);
+
+        return {
+            records,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+            },
+        };
     }
 
     async findOne(id: string) {
@@ -23,21 +42,21 @@ export class DepartmentsService {
         return item;
     }
 
-    async create(dto: CreateDepartmentDto, imagePath: string) {
-        const entity = this.repo.create({ ...dto, imagePath: imagePath });
+    async create(dto: CreateDepartmentDto, imagePath?: string) {
+        const entity = this.repo.create({ ...dto, imagePath: imagePath ?? null });
         return this.repo.save(entity);
     }
 
-    async update(id: string, dto: UpdateDepartmentDto, imagePath: string) {
+
+    async update(id: string, dto: UpdateDepartmentDto, imagePath?: string) {
         const existing = await this.repo.findOne({ where: { id } });
         if (!existing) throw new NotFoundException('Department not found');
 
-        // if imagePath provided and existing has image, delete old file
         if (imagePath && existing.imagePath) {
             await deleteFile(existing.imagePath);
         }
 
-        const merged = this.repo.merge(existing, { ...dto, imagePath: imagePath ?? existing.imagePath });
+        const merged = this.repo.merge(existing, { ...dto, ...(imagePath ? { imagePath } : {}) });
         return this.repo.save(merged);
     }
 

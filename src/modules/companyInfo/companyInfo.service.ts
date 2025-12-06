@@ -24,16 +24,17 @@ export class CompanyInfoService {
     async addInfo(data: CreateCompanyInfoDto, imagePath: string): Promise<CompanyInfo> {
         // Check if section already exists
         const exists = await this.companyInfoRepo.findOne({
-            where: { section: data.sectionKey },
+            where: { section: data.section },
         });
 
         if (exists) {
-            throw new BadRequestException(`Section "${data.sectionKey}" already exists`);
+            throw new BadRequestException(`Section "${data.section}" already exists`);
         }
+
 
         const info = this.companyInfoRepo.create({
             ...data,
-            imagePath: imagePath || null,
+            imagePath: imagePath,
         });
 
         return this.companyInfoRepo.save(info);
@@ -60,7 +61,7 @@ export class CompanyInfoService {
             }
         }
 
-        await this.companyInfoRepo.update(existing.id, { ...data, imagePath });
+        await this.companyInfoRepo.update(existing.id, { ...data, ...(imagePath ? { imagePath } : {}) });
 
         return this.companyInfoRepo.findOne({
             where: { id: existing.id },

@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { CompanyInfoService } from './companyInfo.service';
 import { CompanyInfo } from 'src/common/entities/companyInfo.entity';
 import { CreateCompanyInfoDto } from './dto/create-company-info.dto';
 import { UpdateCompanyInfoDto } from './dto/update-company-info.dto';
 import { imageUploadConfig } from 'src/common/utils/file.util';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiOperation } from '@nestjs/swagger';
 
 @Controller('company-info')
 export class CompanyInfoController {
@@ -16,16 +17,29 @@ export class CompanyInfoController {
     }
 
     @Get(':id')
+    @ApiOperation({ summary: 'Get company info by ID', description: 'Fetches a single info by their unique identifier' })
     async getBySection(@Param('id') id: string) {
         return this.companyInfoService.getBySection(id);
     }
 
+
     @Post()
     @UseInterceptors(FileInterceptor('image', imageUploadConfig('company-info')))
-    async addInfo(@UploadedFile() file: any, @Body() dto: CreateCompanyInfoDto): Promise<CompanyInfo> {
-        const imagePath = file ? file.path : undefined;
-
-        return this.companyInfoService.addInfo(dto, imagePath);
+    @ApiOperation({ summary: 'Add company info with optional image upload' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        description: 'Company info payload with optional image',
+        type: CreateCompanyInfoDto,
+    })
+    async addInfo(
+        @UploadedFile() file: any,
+        @Body() dto: CreateCompanyInfoDto,
+    ): Promise<CompanyInfo> {
+        let path = '';
+        if (file) {
+            path = `uploads/images/company-info/${file.filename}`;
+        }
+        return this.companyInfoService.addInfo(dto, path);
     }
 
     @Put(':id')
@@ -35,8 +49,11 @@ export class CompanyInfoController {
         @Param('id') id: string,
         @Body() dto: UpdateCompanyInfoDto
     ): Promise<CompanyInfo | null> {
-        const imagePath = file ? file.path : undefined;
-        return this.companyInfoService.updateInfo(id, dto, imagePath);
+        let path: string = '';
+        if (file) {
+            path = `uploads/images/company-info/${file.filename}`;
+        }
+        return this.companyInfoService.updateInfo(id, dto, path);
     }
 
 

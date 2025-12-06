@@ -13,8 +13,27 @@ export class TeamsService {
         private readonly repo: Repository<TeamMember>,
     ) { }
 
-    findAll() {
-        return this.repo.find();
+    async findAll(page: number, limit: number) {
+        const take = limit ?? 15;
+        const skip = (page - 1) * limit;
+
+        const [records, total] = await this.repo.findAndCount({
+            skip,
+            take,
+            order: { created_at: 'ASC' }, // optional
+        });
+
+        const totalPages = Math.ceil(total / limit);
+
+        return {
+            records,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+            },
+        };
     }
 
     async findOne(id: string) {
@@ -36,7 +55,7 @@ export class TeamsService {
             await deleteFile(existing.imagePath);
         }
 
-        const merged = this.repo.merge(existing, { ...dto, imagePath: imagePath ?? existing.imagePath });
+        const merged = this.repo.merge(existing, { ...dto, ...(imagePath ? { imagePath } : {}) });
         return this.repo.save(merged);
     }
 
