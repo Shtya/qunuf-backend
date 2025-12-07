@@ -37,6 +37,7 @@ export function imageUploadConfig(folder: string, size: number = 10) { // size i
                 cb(null, dir);
             },
             filename: (_req, file, cb) => {
+                file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
                 cb(null, randName(file.originalname));
             }
         }),
