@@ -1,6 +1,7 @@
 import { ensureDir, remove } from 'fs-extra';
 import { join, extname } from 'path';
 import { diskStorage } from 'multer';
+import { existsSync, mkdirSync } from 'fs';
 
 export function ensureDirectory(dir: string) {
     return ensureDir(dir);
@@ -12,8 +13,9 @@ export function randName(orig: string) {
     return `${name}${ext}`;
 }
 
-export async function deleteFile(filePath: string) {
+export async function deleteFile(filePath: string | null) {
     try {
+        if (!filePath) return;
         await remove(filePath);
     } catch (err) {
         // ignore missing file errors
@@ -27,13 +29,15 @@ export const IMG_RE = /^image\/(jpeg|png|webp|gif|bmp|tiff)$/;
 export function imageUploadConfig(folder: string, size: number = 10) { // size in MB
     return {
         storage: diskStorage({
-            destination: async (_req, file, cb) => {
+            destination: (_req, file, cb) => {
                 if (!IMG_RE.test(file.mimetype)) {
                     return cb(new Error('Only image files allowed'), '');
                 }
 
                 const dir = join(process.cwd(), 'uploads', 'images', folder);
-                await ensureDirectory(dir);
+                if (!existsSync(dir)) {
+                    mkdirSync(dir, { recursive: true });
+                }
                 cb(null, dir);
             },
             filename: (_req, file, cb) => {

@@ -105,8 +105,8 @@ export class AuthController {
     }
 
 
-    @UseGuards(JwtAuthGuard)
     @Get('me')
+    @UseGuards(JwtAuthGuard)
     @ApiOperation({ summary: 'Get current logged-in user' })
     @ApiResponse({ status: 200, description: 'Current user info returned' })
     @ApiNotFoundResponse({ description: 'User not found' })
@@ -116,8 +116,8 @@ export class AuthController {
     }
 
 
-    @UseGuards(JwtAuthGuard)
     @Post('account-deactivation')
+    @UseGuards(JwtAuthGuard)
     @ApiOperation({ summary: 'Deactivate user account' })
     @ApiResponse({ status: 200, description: 'Account deactivated successfully' })
     @ApiNotFoundResponse({ description: 'User not found' })

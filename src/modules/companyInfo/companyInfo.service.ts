@@ -45,25 +45,19 @@ export class CompanyInfoService {
     }
 
 
-
-    async updateInfo(id: string, data: UpdateCompanyInfoDto, imagePath: string) {
+    async updateInfo(id: string, dto: UpdateCompanyInfoDto, imagePath: string) {
         const existing = await this.companyInfoRepo.findOne({ where: { id } });
         if (!existing) {
             throw new BadRequestException('Company section not found');
         }
 
-        // If a new image is uploaded → delete old one
-        if (imagePath && existing.imagePath) {
+        Object.assign(existing, dto);
+        if (imagePath) {
             await deleteFile(existing.imagePath);
+            existing.imagePath = imagePath;
         }
-
-        await this.companyInfoRepo.update(existing.id, {
-            ...data,
-            ...(imagePath ? { imagePath } : {}),
-        });
-
-        const updated = await this.companyInfoRepo.findOne({ where: { id: existing.id } });
-        return updated;
+        // 4. Save and return
+        return await this.companyInfoRepo.save(existing);
     }
 
     async deleteInfo(id: string) {
@@ -71,6 +65,8 @@ export class CompanyInfoService {
         if (!existing) {
             throw new BadRequestException('Company section not found');
         }
+
+        if (existing.imagePath) await deleteFile(existing.imagePath);
 
         await this.companyInfoRepo.delete(id);
         return null;

@@ -17,6 +17,8 @@ import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
 import { ApiTags, ApiConsumes, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Auth } from 'src/common/decorators/auth.decorator';
+import { UserRole } from 'src/common/entities/user.entity';
 
 
 @ApiTags('Departments')
@@ -48,6 +50,7 @@ export class DepartmentsController {
     }
 
     @Post()
+    @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Create a new department' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: CreateDepartmentDto })
@@ -65,6 +68,7 @@ export class DepartmentsController {
     }
 
     @Put(':id')
+    @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Update a department' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: UpdateDepartmentDto })
@@ -84,6 +88,7 @@ export class DepartmentsController {
     }
 
     @Delete(':id')
+    @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Delete a department' })
     @ApiParam({ name: 'id', type: String })
     @ApiResponse({ status: 200, description: 'Department deleted successfully' })

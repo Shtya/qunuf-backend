@@ -5,6 +5,8 @@ import { UpdateCompanyInfoDto } from './dto/update-company-info.dto';
 import { imageUploadConfig } from 'src/common/utils/file.util';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBadRequestResponse, ApiBody, ApiConsumes, ApiNotFoundResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Auth } from 'src/common/decorators/auth.decorator';
+import { UserRole } from 'src/common/entities/user.entity';
 
 @Controller('company-info')
 @ApiTags('Company Info')
@@ -30,6 +32,7 @@ export class CompanyInfoController {
 
 
     @Post()
+    @Auth(UserRole.ADMIN)
     @UseInterceptors(FileInterceptor('image', imageUploadConfig('company-info')))
     @ApiOperation({ summary: 'Create company info with optional image upload' })
     @ApiConsumes('multipart/form-data')
@@ -49,6 +52,7 @@ export class CompanyInfoController {
 
 
     @Put(':id')
+    @Auth(UserRole.ADMIN)
     @UseInterceptors(FileInterceptor('image', imageUploadConfig('company-info')))
     @ApiOperation({ summary: 'Update company info section' })
     @ApiConsumes('multipart/form-data')
@@ -69,6 +73,7 @@ export class CompanyInfoController {
 
 
     @Delete(':id')
+    @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Delete company info section' })
     @ApiResponse({ status: 200, description: 'Company section deleted successfully' })
     @ApiNotFoundResponse({ description: 'Company section not found' })

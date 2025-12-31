@@ -17,6 +17,8 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { imageUploadConfig } from 'src/common/utils/file.util';
 import { ApiTags, ApiConsumes, ApiBody, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Auth } from 'src/common/decorators/auth.decorator';
+import { UserRole } from 'src/common/entities/user.entity';
 
 @ApiTags('Teams')
 @Controller('teams')
@@ -47,6 +49,7 @@ export class TeamsController {
     }
 
     @Post()
+    @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Create a new team member' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: CreateTeamDto })
@@ -64,6 +67,7 @@ export class TeamsController {
     }
 
     @Put(':id')
+    @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Update a team member' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: UpdateTeamDto })
@@ -84,6 +88,7 @@ export class TeamsController {
     }
 
     @Delete(':id')
+    @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Delete a team member' })
     @ApiParam({ name: 'id', type: 'string' })
     @ApiResponse({ status: 200, description: 'Team member deleted successfully' })

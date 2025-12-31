@@ -22,7 +22,7 @@ export class TeamMember extends CoreEntity {
 
     @Column({ type: 'varchar', length: 1024, nullable: true })
     @ApiProperty({ description: 'Image path', required: true })
-    imagePath?: string | null;
+    imagePath: string | null;
 
     @Column({ length: 50 })
     @ApiProperty({ description: 'Phone number', required: true })

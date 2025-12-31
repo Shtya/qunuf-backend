@@ -303,7 +303,7 @@ export class AuthService {
     }
 
 
-    private signTokens(user: User, sessionId: string) {
+    private signTokens(user: Partial<User>, sessionId: string) {
         const accessToken = this.jwtService.sign(
             {
                 sub: user.id,

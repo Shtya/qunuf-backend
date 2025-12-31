@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User, UserStatus } from '../../common/entities/user.entity';
+import { User, UserRole, UserStatus } from '../../common/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -16,10 +16,11 @@ export class UsersService {
 
   async validateUser(email: string, password: string) {
     // 1. Find user by email
-    const user = await this.userRepository.findOne({
-      where: { email },
-      select: ['id', 'email', 'passwordHash', 'status', 'role'], // include passwordHash
-    });
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.email = :email', { email })
+      .addSelect('user.passwordHash') // This "adds" the hidden field to the normal selection
+      .getOne();
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -32,7 +33,9 @@ export class UsersService {
     }
 
     // 3. Return user if valid
-    return user;
+    const { passwordHash, ...userWithoutPassword } = user;
+
+    return userWithoutPassword;
   }
 
   async create(createUserDto: CreateUserDto) {
@@ -42,6 +45,11 @@ export class UsersService {
 
     if (existingUser) {
       throw new ConflictException('Email already exists');
+    }
+
+    const allowedRoles = [UserRole.TENANT, UserRole.LANDLORD];
+    if (!allowedRoles.includes(createUserDto.role)) {
+      throw new BadRequestException('Invalid role. Registration only allowed for Tenants and Landlords.');
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);

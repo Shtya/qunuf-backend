@@ -23,6 +23,9 @@ export class CreateUserDto {
     })
     password: string;
 
-    @IsEnum(UserRole, { message: 'Role must be either TENANT or LANDLORD' })
+    @IsNotEmpty()
+    @IsIn([UserRole.TENANT, UserRole.LANDLORD], {
+        message: 'Role must be either tenant or landlord',
+    })
     role: UserRole;
 }

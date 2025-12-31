@@ -18,6 +18,7 @@ import { SwaggerSyncModule } from 'nestjs-swagger-sync';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { ContactUsModule } from './modules/contactUsMessages/contactUs.module';
+import { BlogsModule } from './modules/blogs/blogs.module';
 
 @Module({
   imports: [
@@ -65,7 +66,8 @@ import { ContactUsModule } from './modules/contactUsMessages/contactUs.module';
     CompanyInfoModule,
     DepartmentsModule,
     TeamsModule,
-    ContactUsModule
+    ContactUsModule,
+    BlogsModule
   ],
   controllers: [AppController, AuthController],
   providers: [CustomValidationPipe],

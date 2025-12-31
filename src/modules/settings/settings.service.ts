@@ -20,11 +20,8 @@ export class SettingsService {
         if (!settings) {
             // Create default values if none exist
             settings = this.settingsRepo.create({
-                privacyPolicy: null,
-                termsOfService: null,
                 platformPercent: 2.5,
-                contactEmail: process.env.APP_CONTACT_EMAIL || null,
-                address: null,
+                contactEmail: process.env.APP_CONTACT_EMAIL || null
             });
 
             const saved = await this.settingsRepo.save(settings);
@@ -38,6 +35,18 @@ export class SettingsService {
         // Save to cache
         await this.cacheManager.set(this.CACHE_KEY, settings);
         return settings;
+    }
+
+    async getPublicSettings() {
+        const settings = await this.getSettings();
+
+        const {
+            platformPercent, // Extract the secret prop here
+            ...publicData
+        } = settings;
+
+        // 3. Return only the public data
+        return publicData;
     }
 
     async updateSettings(updateDto: Partial<Settings>) {

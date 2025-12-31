@@ -5,11 +5,17 @@ import { CoreEntity } from "./coreEntity";
 
 @Entity('settings')
 export class Settings extends CoreEntity {
-    @Column({ name: "privacy_policy", type: 'text', nullable: true })
-    privacyPolicy: string | null;
+    @Column({ name: "privacy_policy_en", type: 'text', nullable: true })
+    privacyPolicy_en: string | null;
 
-    @Column({ name: "terms_of_service", type: 'text', nullable: true })
-    termsOfService: string | null;
+    @Column({ name: "terms_of_service_en", type: 'text', nullable: true })
+    termsOfService_en: string | null;
+
+    @Column({ name: "privacy_policy_ar", type: 'text', nullable: true })
+    privacyPolicy_ar: string | null;
+
+    @Column({ name: "terms_of_service_ar", type: 'text', nullable: true })
+    termsOfService_ar: string | null;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
     facebook: string | null;

@@ -50,15 +50,12 @@ export class DepartmentsService {
         const existing = await this.repo.findOne({ where: { id } });
         if (!existing) throw new NotFoundException('Department not found');
 
-        // Delete old image if a new one is uploaded
-        if (imagePath && existing.imagePath) {
+        Object.assign(existing, dto);
+        if (imagePath) {
             await deleteFile(existing.imagePath);
+            existing.imagePath = imagePath;
         }
-
-        const merged = this.repo.merge(existing, { ...dto, ...(imagePath ? { imagePath } : {}) });
-        const updated = await this.repo.save(merged);
-
-        return updated;
+        return await this.repo.save(existing);
     }
 
     async remove(id: string) {
