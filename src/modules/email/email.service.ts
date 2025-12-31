@@ -4,7 +4,6 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { SettingsService } from '../settings/settings.service';
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Settings } from 'src/common/entities/settings.entity';
-import { Result } from 'src/common/utils/Result';
 
 @Injectable()
 export class EmailService {
@@ -19,28 +18,17 @@ export class EmailService {
         let settings = await this.cacheManager.get<Settings>(this.settingsService.CACHE_KEY);
 
         if (!settings) {
-            const result = await this.settingsService.getSettings();
-
-            // If your service already returns Result, use it
-            if (!result.isOk) {
-                return result;
-            }
-
-            settings = result.data as Settings;
+            settings = await this.settingsService.getSettings();
         }
 
-        return Result.ok(settings, 'App settings fetched successfully');
+        return settings
     }
 
 
     private async sendMail(to: string, subject: string, template: string, context: any) {
-        const result = await this.getAppSettings();
+        const settings = await this.getAppSettings();
 
-        if (!result.isOk) {
-            return result;
-        }
 
-        let settings = result.data as Settings;
 
         return this.mailerService.sendMail({
             to,

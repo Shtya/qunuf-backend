@@ -1,5 +1,4 @@
 import { Injectable, ValidationPipe, ValidationError, BadRequestException } from '@nestjs/common';
-import { Result } from '../utils/Result';
 
 @Injectable()
 export class CustomValidationPipe extends ValidationPipe {
@@ -11,7 +10,7 @@ export class CustomValidationPipe extends ValidationPipe {
             exceptionFactory: async (errors: ValidationError[]) => {
                 const plainErrors = await this.formatValidationErrors(errors);
 
-                throw new BadRequestException(Result.validationFail(plainErrors, 'Validation failed'));
+                throw new BadRequestException({ message: 'Validation failed', errors: plainErrors, });
             },
         });
     }

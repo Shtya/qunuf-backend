@@ -5,7 +5,6 @@ import { Repository } from 'typeorm';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { deleteFile } from 'src/common/utils/file.util';
-import { Result } from 'src/common/utils/Result';
 
 @Injectable()
 export class TeamsService {
@@ -31,24 +30,24 @@ export class TeamsService {
             totalPages: Math.ceil(total / limit),
         };
 
-        return Result.ok({ records, pagination }, 'Team members fetched successfully');
+        return { records, pagination };
     }
 
     async findOne(id: string) {
         const item = await this.repo.findOne({ where: { id } });
-        if (!item) return Result.notFound('Team member not found');
-        return Result.ok(item, 'Team member fetched successfully');
+        if (!item) throw new NotFoundException('Team member not found');
+        return item;
     }
 
     async create(dto: CreateTeamDto, imagePath?: string) {
         const entity = this.repo.create({ ...dto, imagePath: imagePath ?? null });
         const saved = await this.repo.save(entity);
-        return Result.created(saved, 'Team member created successfully');
+        return saved;
     }
 
     async update(id: string, dto: UpdateTeamDto, imagePath?: string) {
         const existing = await this.repo.findOne({ where: { id } });
-        if (!existing) return Result.notFound('Team member not found');
+        if (!existing) throw new NotFoundException('Team member not found');
 
         if (imagePath && existing.imagePath) {
             await deleteFile(existing.imagePath);
@@ -57,16 +56,16 @@ export class TeamsService {
         const merged = this.repo.merge(existing, { ...dto, ...(imagePath ? { imagePath } : {}) });
         const updated = await this.repo.save(merged);
 
-        return Result.ok(updated, 'Team member updated successfully');
+        return updated;
     }
 
     async remove(id: string) {
         const existing = await this.repo.findOne({ where: { id } });
-        if (!existing) return Result.notFound('Team member not found');
+        if (!existing) throw new NotFoundException('Team member not found');
 
         if (existing.imagePath) await deleteFile(existing.imagePath);
 
         await this.repo.delete(id);
-        return Result.ok(null, 'Team member deleted successfully');
+        return null;
     }
 }

@@ -58,12 +58,9 @@ export class AuthController {
     @ApiResponse({ status: 401, description: 'Invalid verification code' })
     @ApiResponse({ status: 302, description: 'Redirects to frontend sign-in page' })
     async verify(@Query('code') code: string, @Query('email') email: string, @Res() res: Response) {
-        const result = await this.authService.verify(code, email);
-        if (!result.isOk) {
-            return result;
-        }
+        const { redirectUrl } = await this.authService.verify(code, email);
 
-        const redirectUrl = (result.data as { redirectUrl: string }).redirectUrl;
+
         return res.redirect(redirectUrl);
     }
 

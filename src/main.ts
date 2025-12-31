@@ -3,8 +3,7 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger, VersioningType } from '@nestjs/common';
 import { CustomValidationPipe } from './common/pipes/customValidation.pipe';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { GlobalExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 
@@ -30,13 +29,12 @@ async function bootstrap() {
   });
 
 
-  app.useGlobalInterceptors(new ResponseInterceptor());
   app.useStaticAssets(join(__dirname, '..', '/uploads'), { prefix: '/uploads/' });
 
   const customValidationPipe = app.get(CustomValidationPipe);
   app.useGlobalPipes(customValidationPipe);
 
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new GlobalExceptionsFilter());
 
   const config = new DocumentBuilder()
     .setTitle('Qunuf API')

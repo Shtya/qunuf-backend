@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Repository, ILike } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ContactUsMessage } from 'src/common/entities/contact_us_messages';
-import { Result } from 'src/common/utils/Result';
+
 import { CreateContactUsDto } from './dto/create-contact-us-dto';
 
 
@@ -16,7 +16,7 @@ export class ContactUsService {
     async create(dto: CreateContactUsDto) {
         const entity = this.repo.create(dto);
         const saved = await this.repo.save(entity);
-        return Result.ok(saved, 'Message submitted successfully');
+        return saved;
     }
 
     async findAll(page = 1, limit = 15, search?: string) {
@@ -45,12 +45,12 @@ export class ContactUsService {
             totalPages: Math.ceil(total / limit),
         };
 
-        return Result.ok({ records, pagination }, 'Messages fetched successfully');
+        return { records, pagination };
     }
 
     async findOne(id: string) {
         const item = await this.repo.findOne({ where: { id } });
-        if (!item) return Result.notFound('Message not found');
-        return Result.ok(item, 'Message fetched successfully');
+        if (!item) throw new NotFoundException('Message not found');
+        return item;
     }
 }

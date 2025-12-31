@@ -5,8 +5,6 @@ import { Repository } from 'typeorm';
 import { CreateCompanyInfoDto } from './dto/create-company-info.dto';
 import { UpdateCompanyInfoDto } from './dto/update-company-info.dto';
 import { deleteFile } from 'src/common/utils/file.util';
-import { Result } from 'src/common/utils/Result';
-
 
 @Injectable()
 export class CompanyInfoService {
@@ -17,15 +15,15 @@ export class CompanyInfoService {
 
     async getAll() {
         const records = await this.companyInfoRepo.find();
-        return Result.ok(records, 'Company info fetched successfully');
+        return records;
     }
 
     async getBySection(id: string) {
         const item = await this.companyInfoRepo.findOne({ where: { id } });
         if (!item) {
-            return Result.badRequest('Company section not found', 404, null);
+            throw new BadRequestException('Company section not found');
         }
-        return Result.ok(item, 'Company section fetched successfully');
+        return item;
     }
 
     async addInfo(data: CreateCompanyInfoDto, imagePath: string) {
@@ -34,7 +32,7 @@ export class CompanyInfoService {
         });
 
         if (exists) {
-            return Result.badRequest(`Section "${data.section}" already exists`, 400, null);
+            throw new BadRequestException(`Section "${data.section}" already exists`);
         }
 
         const info = this.companyInfoRepo.create({
@@ -43,7 +41,7 @@ export class CompanyInfoService {
         });
 
         const saved = await this.companyInfoRepo.save(info);
-        return Result.ok(saved, 'Company section added successfully');
+        return saved;
     }
 
 
@@ -51,7 +49,7 @@ export class CompanyInfoService {
     async updateInfo(id: string, data: UpdateCompanyInfoDto, imagePath: string) {
         const existing = await this.companyInfoRepo.findOne({ where: { id } });
         if (!existing) {
-            return Result.badRequest('Company section not found', 404, null);
+            throw new BadRequestException('Company section not found');
         }
 
         // If a new image is uploaded → delete old one
@@ -65,16 +63,16 @@ export class CompanyInfoService {
         });
 
         const updated = await this.companyInfoRepo.findOne({ where: { id: existing.id } });
-        return Result.ok(updated, 'Company section updated successfully');
+        return updated;
     }
 
     async deleteInfo(id: string) {
         const existing = await this.companyInfoRepo.findOne({ where: { id } });
         if (!existing) {
-            return Result.badRequest('Company section not found', 404, null);
+            throw new BadRequestException('Company section not found');
         }
 
         await this.companyInfoRepo.delete(id);
-        return Result.ok(null, 'Company section deleted successfully');
+        return null;
     }
 }

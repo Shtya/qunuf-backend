@@ -1,11 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserStatus } from '../../common/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { Result } from 'src/common/utils/Result';
 
 
 @Injectable()
@@ -23,17 +22,17 @@ export class UsersService {
     });
 
     if (!user) {
-      return Result.unauthorized('Invalid credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     // 2. Compare provided password with stored hash
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      return Result.unauthorized('Invalid credentials');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     // 3. Return user if valid
-    return Result.ok(user, 'User validated successfully');
+    return user;
   }
 
   async create(createUserDto: CreateUserDto) {
@@ -42,7 +41,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      return Result.conflict('Email already exists');
+      throw new ConflictException('Email already exists');
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
@@ -56,34 +55,34 @@ export class UsersService {
     });
 
     const saved = await this.userRepository.save(user);
-    return Result.created(saved, 'User created successfully');
+    return saved;
   }
 
   async findAll() {
     const users = await this.userRepository.find();
-    return Result.ok(users, 'Users fetched successfully');
+    return users;
   }
 
   async findOne(id: string) {
     const user = await this.userRepository.findOne({ where: { id } });
-    if (!user) return Result.notFound('User not found');
-    return Result.ok(user, 'User fetched successfully');
+    if (!user) throw new NotFoundException('User not found');
+    return user;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
     const user = await this.userRepository.findOne({ where: { id } });
-    if (!user) return Result.notFound('User not found');
+    if (!user) throw new NotFoundException('User not found');
 
     const merged = this.userRepository.merge(user, updateUserDto);
     const updated = await this.userRepository.save(merged);
-    return Result.ok(updated, 'User updated successfully');
+    return updated;
   }
 
   async remove(id: string) {
     const user = await this.userRepository.findOne({ where: { id } });
-    if (!user) return Result.notFound('User not found');
+    if (!user) throw new NotFoundException('User not found');
 
     await this.userRepository.delete(id);
-    return Result.ok(null, 'User deleted successfully');
+    return null;
   }
 }

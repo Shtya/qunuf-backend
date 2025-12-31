@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Request } from "express";
 import { Session } from "src/common/entities/session.entity";
-import { Result } from "src/common/utils/Result";
+
 import { IsNull, Repository } from "typeorm";
 
 @Injectable()
@@ -33,17 +33,17 @@ export class SessionsService {
         });
 
         const saved = await this.sessionRepository.save(session);
-        return Result.created(saved, 'Session created successfully');
+        return saved;
     }
 
     async updateRefreshTokenHash(sessionId: string, refreshTokenHash: string) {
         const session = await this.sessionRepository.findOne({ where: { id: sessionId } });
 
-        if (!session) return Result.notFound('Session not found');
+        if (!session) throw new NotFoundException('Session not found');
 
         session.refreshTokenHash = refreshTokenHash;
         const updated = await this.sessionRepository.save(session);
-        return Result.ok(updated, 'Refresh token updated successfully');
+        return updated;
     }
 
     async getSession(sessionId: string) {
@@ -51,17 +51,17 @@ export class SessionsService {
             where: { id: sessionId, revokedAt: IsNull() },
         });
 
-        if (!session) return Result.notFound('Session not found');
-        return Result.ok<Session>(session, 'Session fetched successfully');
+        if (!session) throw new NotFoundException('Session not found');
+        return session;
     }
 
     async revokeSession(sessionId: string) {
         const session = await this.sessionRepository.findOne({ where: { id: sessionId } });
-        if (!session) return Result.notFound('Session not found');
+        if (!session) throw new NotFoundException('Session not found');
 
         session.revokedAt = new Date();
         await this.sessionRepository.save(session);
-        return Result.ok(null, 'Session revoked successfully');
+        return null;
     }
 
     async revokeAllUserSessions(userId: string) {
@@ -69,6 +69,6 @@ export class SessionsService {
             { userId, revokedAt: IsNull() },
             { revokedAt: new Date() },
         );
-        return Result.ok(null, 'All user sessions revoked successfully');
+        return null;
     }
 }

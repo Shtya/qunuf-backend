@@ -2,7 +2,6 @@ import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Settings } from 'src/common/entities/settings.entity';
-import { Result } from 'src/common/utils/Result';
 import { Repository } from 'typeorm';
 
 @Injectable()
@@ -33,12 +32,12 @@ export class SettingsService {
             // Save to cache
             await this.cacheManager.set(this.CACHE_KEY, saved);
 
-            return Result.created(saved, 'Default settings created');
+            return saved;
         }
 
         // Save to cache
         await this.cacheManager.set(this.CACHE_KEY, settings);
-        return Result.ok(settings, 'Settings fetched successfully');
+        return settings;
     }
 
     async updateSettings(updateDto: Partial<Settings>) {
@@ -53,6 +52,6 @@ export class SettingsService {
         const saved = await this.settingsRepo.save(settings);
 
         await this.cacheManager.set(this.CACHE_KEY, saved);
-        return Result.ok(saved, 'Settings updated successfully');
+        return saved;
     }
 }
