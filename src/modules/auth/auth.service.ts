@@ -413,5 +413,4 @@ export class AuthService {
 
         return { message: 'Account deactivated successfully' };
     }
-
 }

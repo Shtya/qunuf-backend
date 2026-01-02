@@ -19,6 +19,9 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { ContactUsModule } from './modules/contactUsMessages/contactUs.module';
 import { BlogsModule } from './modules/blogs/blogs.module';
+import { CountriesModule } from './modules/countries/countries.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -51,7 +54,7 @@ import { BlogsModule } from './modules/blogs/blogs.module';
       isGlobal: true,
     }),
     SwaggerSyncModule.register({
-      apiKey: 'PMAK-69317999c435a500014aec2a-2b9a9fbe3ddf8ddb28efec4fd44cc89cab',
+      apiKey: process.env.POSTMAN_API_KEY as string,
       swaggerPath: 'api/docs',
       baseUrl: 'http://localhost:8081',
       collectionName: "backend",
@@ -67,7 +70,10 @@ import { BlogsModule } from './modules/blogs/blogs.module';
     DepartmentsModule,
     TeamsModule,
     ContactUsModule,
-    BlogsModule
+    BlogsModule,
+    CountriesModule,
+    ConversationsModule,
+    NotificationModule
   ],
   controllers: [AppController, AuthController],
   providers: [CustomValidationPipe],

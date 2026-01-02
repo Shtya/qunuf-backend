@@ -5,6 +5,7 @@ import { Not, Repository } from "typeorm";
 import { CreateBlogDto } from "./dto/create-blog.dto";
 import { UpdateBlogDto } from "./dto/update-blog.dto";
 import { deleteFile } from "src/common/utils/file.util";
+import { CRUD } from "src/common/services/crud.service";
 
 
 @Injectable()
@@ -32,39 +33,7 @@ export class BlogsService {
     async findAllCursor(cursor?: { createdAt: Date; id: string }, limit: number = 20) {
         const queryBuilder = this.blogRepo.createQueryBuilder('blog');
 
-        if (cursor) {
-            queryBuilder.where(
-                '(blog.created_at, blog.id) < (:createdAt, :id)',
-                { createdAt: cursor.createdAt, id: cursor.id }
-            );
-        }
-
-        queryBuilder
-            .orderBy('blog.created_at', 'DESC')
-            .addOrderBy('blog.id', 'DESC')
-            .take(limit + 1);
-
-        const items = await queryBuilder.getMany();
-
-        // 3. Logic for "hasMore" and nextCursor
-        const hasMore = items.length > limit;
-
-        if (hasMore) {
-            items.pop();
-        }
-
-        const nextCursor = hasMore
-            ? {
-                createdAt: items[items.length - 1].created_at,
-                id: items[items.length - 1].id,
-            }
-            : null;
-
-        return {
-            items,
-            nextCursor,
-            hasMore
-        };
+        return CRUD.paginateCursor(queryBuilder, 'blog', cursor, limit);
     }
 
     async create(dto: CreateBlogDto, imagePath: string): Promise<Blog> {

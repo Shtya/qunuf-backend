@@ -20,6 +20,7 @@ import { imageUploadConfig } from "src/common/utils/file.util";
 import { UpdateBlogDto } from "./dto/update-blog.dto";
 import { Auth } from "src/common/decorators/auth.decorator";
 import { UserRole } from "src/common/entities/user.entity";
+import { decodeCursor, encodeCursor } from "src/common/utils/crud.util";
 
 @ApiTags('Blogs')
 @Controller('blogs')
@@ -37,27 +38,14 @@ export class BlogsController {
     ) {
         const safeLimit = Math.min(Number(limit) || 20, 20);
 
-        let parsedCursor: { createdAt: Date; id: string } | undefined;
-
-        // Decode the Base64 cursor if it exists
-        if (cursor) {
-            try {
-                const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
-                const { createdAt, id } = JSON.parse(decoded);
-                parsedCursor = { createdAt: new Date(createdAt), id };
-            } catch (e) {
-                parsedCursor = undefined;
-            }
-        }
+        const parsedCursor = decodeCursor(cursor);
 
         const result = await this.blogsService.findAllCursor(parsedCursor, safeLimit);
 
         // Encode the nextCursor back to Base64 for the frontend
         const response = {
             ...result,
-            nextCursor: result.nextCursor
-                ? Buffer.from(JSON.stringify(result.nextCursor)).toString('base64')
-                : null
+            nextCursor: encodeCursor(result.nextCursor)
         };
 
         return response;

@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, Version, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Req, Version, Get, Query, Res, UseGuards, Put } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Request, Response } from 'express';
 import { LoginDto } from './dto/login.dto';
@@ -125,5 +125,7 @@ export class AuthController {
     async deactivateAccount(@User() user: any) {
         return this.authService.deactivateAccount(user.id);
     }
+
+
 
 }

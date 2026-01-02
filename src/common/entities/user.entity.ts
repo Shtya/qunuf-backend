@@ -1,7 +1,8 @@
 
-import { Entity, Column, OneToMany, Relation } from "typeorm";
+import { Entity, Column, OneToMany, Relation, ManyToOne, JoinColumn } from "typeorm";
 import { CoreEntity } from './coreEntity';
 import type { Session } from "./session.entity";
+import { Country } from "./country.entity";
 
 export enum UserRole {
     ADMIN = 'admin',
@@ -16,6 +17,16 @@ export enum UserStatus {
     SUSPENDED = 'suspended',  // admin or violation
     DELETED = 'deleted',
 }
+
+export enum IdentityType {
+    NATIONAL_ID = 'national_id',              // هوية وطنية
+    RESIDENCY = 'residency',                  // هوية مقيم
+    PREMIUM_RESIDENCY = 'premium_residency',  // إقامة مميزة
+    GCC_ID = 'gcc_id',                        // هوية خليجية
+    PASSPORT = 'passport',                    // جواز سفر
+    OTHER = 'other',                          // أخرى
+}
+
 
 @Entity('users')
 export class User extends CoreEntity {
@@ -71,6 +82,41 @@ export class User extends CoreEntity {
 
     @Column({ type: 'timestamptz', nullable: true, name: 'last_login' })
     lastLogin: Date | null;
+
+
+    @ManyToOne(() => Country, { nullable: true })
+    @JoinColumn({ name: 'country_id' })
+    country: Country | null;   // nationality
+
+    @Column({ name: 'country_id', nullable: true })
+    countryId: string | null;
+
+    @Column({
+        type: 'enum',
+        enum: IdentityType,
+        nullable: true,
+        name: 'identity_type',
+    })
+    identityType: IdentityType | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true, name: 'identity_number' })
+    identityNumber: string | null;
+
+    @ManyToOne(() => Country, { nullable: true })
+    @JoinColumn({ name: 'identity_issue_country_id' })
+    identityIssueCountry: Country | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true, name: 'identity_other_type' })
+    identityOtherType: string | null;
+
+    @Column({ type: 'date', nullable: true, name: 'birth_date' })
+    birthDate: Date | null;
+
+    @Column({ type: 'varchar', length: 20, nullable: true, name: 'phone_number' })
+    phoneNumber: string | null;
+
+    @Column({ name: 'notification_unread_count', default: 0 })
+    notificationUnreadCount: number;
 
     @OneToMany('Session', 'User')
     sessions: Relation<Session[]>;

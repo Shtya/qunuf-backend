@@ -1,15 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Body, Controller, Put, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { User } from 'src/common/decorators/user.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Auth } from 'src/common/decorators/auth.decorator';
-import { UserRole } from 'src/common/entities/user.entity';
-import { EmailService } from '../email/email.service';
+import { ApiBody, ApiNotFoundResponse, ApiOperation, ApiResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService,
-    private readonly emailService: EmailService
+  constructor(private readonly usersService: UsersService
   ) { }
 
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBody({ type: UpdateUserDto })
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async updateProfile(@User() user: any, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(user.id, dto);
+  }
 }
