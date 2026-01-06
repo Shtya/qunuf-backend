@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID, MaxLength, MinLength, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SendMessageDto {
@@ -19,4 +19,12 @@ export class SendMessageDto {
     @MinLength(1, { message: 'Message must contain at least 1 character' })
     @MaxLength(3000, { message: 'Message is too long (max 3000 characters)' })
     content: string;
+
+    @ApiProperty({
+        example: 'temp-123-xyz',
+        description: 'Temporary client-side ID for UI synchronization'
+    })
+    @IsString()
+    @IsOptional() // Optional so it doesn't break old clients, but recommended
+    tempId?: string;
 }

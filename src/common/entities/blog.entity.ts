@@ -17,6 +17,8 @@ export class Blog extends CoreEntity {
     @Column({ unique: true })
     slug: string;
 
+
+
     @BeforeInsert()
     @BeforeUpdate() // Keeps the slug in sync if the title changes
     generateSlug() {

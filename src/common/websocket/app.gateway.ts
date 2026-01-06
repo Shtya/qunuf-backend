@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { Notification } from '../entities/notification.entity';
 
 
 @WebSocketGateway({
@@ -74,11 +75,10 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
 
-    sendToUser(recipientId: string, message: any, sender: any) {
+    sendToUser(recipientId: string, messagePayload: any) {
         // Emits only to the specific user's room
-        this.server.to(`user_${recipientId}`).emit('message:received', { ...message, sender });
+        this.server.to(`user_${recipientId}`).emit('message:received', { ...messagePayload });
     }
-
 
 
     emitMarkedAsRead(userId: string, data: any) {
@@ -86,7 +86,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
 
-    emitNewNotification(userId: string, notification: any) {
+    emitNewNotification(userId: string, notification: Notification) {
         this.server.to(`user_${userId}`).emit("new_notification", notification);
         console.log("📢 Sent notification to user:", userId);
     }

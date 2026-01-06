@@ -1,7 +1,8 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, OneToOne, Relation } from "typeorm";
+import { BeforeInsert, Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, OneToOne, Relation } from "typeorm";
 import { User } from "./user.entity";
 import { CoreEntity } from "./coreEntity";
 import { Message } from "./message.entity";
+import { ulid } from "ulid";
 
 @Entity('conversations')
 @Index(['participantOneId', 'participantTwoId'], { unique: true })
@@ -44,4 +45,14 @@ export class Conversation extends CoreEntity {
 
     @Column({ name: 'unread_count_two', default: 0 })
     unreadCountTwo: number;
+
+    // Inside Conversation Entity
+    @Column({ name: 'sort_id' })
+    sortId: string;
+
+    @BeforeInsert()
+    generateSortId() {
+        // This creates a ULID using the current time
+        this.sortId = ulid();
+    }
 }

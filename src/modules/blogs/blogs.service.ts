@@ -33,7 +33,12 @@ export class BlogsService {
     async findAllCursor(cursor?: { createdAt: Date; id: string }, limit: number = 20) {
         const queryBuilder = this.blogRepo.createQueryBuilder('blog');
 
-        return CRUD.paginateCursor(queryBuilder, 'blog', cursor, limit);
+        return CRUD.paginateCursor({
+            queryBuilder,
+            alias: 'blog',
+            cursor,
+            limit,
+        });
     }
 
     async create(dto: CreateBlogDto, imagePath: string): Promise<Blog> {

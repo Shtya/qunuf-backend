@@ -9,24 +9,37 @@ export interface CustomPaginatedResponse<T> {
     records: T[];
 }
 
+export interface IPaginateOptions<T extends ObjectLiteral> {
+    queryBuilder: SelectQueryBuilder<T>;
+    alias?: string;
+    sortField?: string; // e.g., 'conversation.sort_id' or 'lastMessage.sort_id'
+    cursor?: { createdAt: Date; id: string };    // The ULID string from the last item
+    limit?: number;
+    sort?: "DESC" | "ASC"
+}
 
 export class CRUD {
-    static async paginateCursor<T extends ObjectLiteral>(
-        queryBuilder: SelectQueryBuilder<T>,
-        alias: string = 'entity',
-        cursor?: { createdAt: Date; id: string },
-        limit: number = 20,
-    ) {
+    static async paginateCursor<T extends ObjectLiteral>(options: IPaginateOptions<T>) {
+        const {
+            queryBuilder,
+            alias = 'entity',
+            sortField = `${alias}.created_at`,
+            cursor,
+            limit = 50,
+            sort = 'DESC'
+        } = options;
+
+
         if (cursor) {
             queryBuilder.andWhere(
-                `(${alias}.created_at, blog.id) < (:createdAt, :id)`,
+                `(${alias}.created_at, ${alias}.id) < (:createdAt, :id)`,
                 { createdAt: cursor.createdAt, id: cursor.id }
             );
         }
 
         queryBuilder
-            .orderBy(`${alias}.created_at`, 'DESC')
-            .addOrderBy(`${alias}.id`, 'DESC')
+            .orderBy(sortField, sort)
+            .addOrderBy(`${alias}.id`, sort)
             .take(limit + 1);
 
         const items = await queryBuilder.getMany();

@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Conversation } from "src/common/entities/conversation.entity";
-import { User, UserRole } from "src/common/entities/user.entity";
-import { Repository } from "typeorm";
+import { User, UserRole, UserStatus } from "src/common/entities/user.entity";
+import { Not, Repository } from "typeorm";
 import { Message } from "src/common/entities/message.entity";
 import { CRUD } from "src/common/services/crud.service";
 import { AppGateway } from "src/common/websocket/app.gateway";
+import { ulid } from "ulid";
+import { faker } from '@faker-js/faker';
+
 
 @Injectable()
 export class ConversationsService {
@@ -46,8 +49,12 @@ export class ConversationsService {
 
         if (existing) {
             const queryBuilder = this.messageRepo.createQueryBuilder('message');
-            queryBuilder.where('message.conversationId = :conversationId', { conversationId: existing.id });
-            const result = await CRUD.paginateCursor(queryBuilder, 'message');
+            queryBuilder.where('message.conversation_id = :conversationId', { conversationId: existing.id });
+            const result = await CRUD.paginateCursor({
+                queryBuilder,
+                alias: 'message',
+                sortField: 'message.sort_id',
+            });
 
             const initialMessages = {
                 messages: result.items,
@@ -97,7 +104,17 @@ export class ConversationsService {
             .leftJoinAndSelect('conversation.participantTwo', 'participantTwo');
 
 
-        const result = await CRUD.paginateCursor(queryBuilder, 'conversation', cursor, limit,);
+        queryBuilder.addSelect(
+            'COALESCE(lastMessage.sort_id, conversation.sort_id)',
+            'effective_sort_id'
+        );
+        const result = await CRUD.paginateCursor({
+            queryBuilder,
+            alias: 'conversation',
+            cursor,
+            limit,
+            sortField: 'effective_sort_id'
+        });
 
         return {
             conversations: result.items,
@@ -107,14 +124,14 @@ export class ConversationsService {
     }
 
 
-    async sendMessage(senderId: string, conversationId: string, content: string) {
+    async sendMessage(senderId: string, conversationId: string, content: string, tempId?: string) {
         // 1. Verify conversation exists
         const conversation = await this.conversationRepo.findOne({
             where: { id: conversationId },
             relations: ['participantTwo', 'participantOne']
         });
 
-        if (!conversation || senderId !== conversation.participantOneId || senderId !== conversation.participantTwoId) {
+        if (!conversation || (senderId !== conversation.participantOneId && senderId !== conversation.participantTwoId)) {
             throw new NotFoundException('Conversation not found or access denied');
         }
         // 2. Create and save message
@@ -144,7 +161,16 @@ export class ConversationsService {
 
         const sender = conversation.participantOneId === senderId ? conversation.participantOne : conversation.participantTwo;
 
-        this.appGateway.sendToUser(receiverId, savedMessage, sender);
+        const socketPayload = {
+            message: savedMessage,
+            tempId, // This is key for the frontend to sync
+            sender
+        };
+
+        //Send to the recipient (all their devices)
+        this.appGateway.sendToUser(receiverId, socketPayload);
+        //Send back to the sender (all their OTHER devices)
+        this.appGateway.sendToUser(sender.id, socketPayload);
 
         return savedMessage;
     }
@@ -155,12 +181,20 @@ export class ConversationsService {
             where: { id: conversationId },
         });
 
-        if (!conversation || userId !== conversation.participantOneId || userId !== conversation.participantTwoId) {
+        if (!conversation || (userId !== conversation.participantOneId && userId !== conversation.participantTwoId)) {
             throw new NotFoundException('Conversation not found or access denied');
         }
         const queryBuilder = this.messageRepo.createQueryBuilder('message');
-        queryBuilder.where('message.conversationId = :conversationId', { conversationId });
-        const result = await CRUD.paginateCursor(queryBuilder, 'message', cursor, limit);
+        queryBuilder.where('message.conversation_id = :conversationId', { conversationId });
+        const result = await CRUD.paginateCursor({
+            queryBuilder,
+            alias: 'message',
+            sortField: 'message.sortId',
+            cursor,
+            limit,
+        });
+
+
 
         return {
             messages: result.items,
@@ -201,6 +235,11 @@ export class ConversationsService {
                 readByUserId: userId,
                 readAt: new Date()
             });
+            this.appGateway.emitMarkedAsRead(userId, {
+                conversationId,
+                readByUserId: userId,
+                readAt: new Date()
+            });
         }
 
         return { success: true };
@@ -208,22 +247,39 @@ export class ConversationsService {
 
 
     async getGlobalUnreadCount(userId: string) {
-
         const result = await this.conversationRepo
             .createQueryBuilder('c')
             .select(`
-            SUM(
+            COALESCE(SUM(
                 CASE 
                     WHEN c.participantOneId = :userId THEN c.unreadCountOne 
                     WHEN c.participantTwoId = :userId THEN c.unreadCountTwo 
                     ELSE 0 
                 END
-            )`, 'total')
+            ), 0)`, 'total') // Added COALESCE for extra safety
             .where('c.participantOneId = :userId OR c.participantTwoId = :userId', { userId })
             .getRawOne();
 
+        // Fix: Add a check for 'result' before accessing 'result.total'
         return {
-            totalUnread: Number(result.total) || 0
+            totalUnread: result ? Number(result.total) : 0
         };
+    }
+
+    /**
+     * Returns a conversation by id including its lastMessage and participants.
+     * Does NOT load the full messages list.
+     */
+    async getConversationById(conversationId: string, userId: string) {
+        const conversation = await this.conversationRepo.findOne({
+            where: { id: conversationId },
+            relations: ['lastMessage', 'participantOne', 'participantTwo'],
+        });
+
+        if (!conversation || (userId !== conversation.participantOneId && userId !== conversation.participantTwoId)) {
+            throw new NotFoundException('Conversation not found or access denied');
+        }
+
+        return conversation;
     }
 }

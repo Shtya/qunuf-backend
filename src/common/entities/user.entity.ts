@@ -115,8 +115,11 @@ export class User extends CoreEntity {
     @Column({ type: 'varchar', length: 20, nullable: true, name: 'phone_number' })
     phoneNumber: string | null;
 
-    @Column({ name: 'notification_unread_count', default: 0 })
+    @Column({ name: 'notification_unread_count', default: 0, select: false })
     notificationUnreadCount: number;
+
+    @Column({ type: 'varchar', length: 1024, nullable: true })
+    imagePath: string | null;
 
     @OneToMany('Session', 'User')
     sessions: Relation<Session[]>;
