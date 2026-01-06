@@ -3,9 +3,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Brackets, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 
 export interface CustomPaginatedResponse<T> {
-    total_records: number;
-    current_page: number;
-    per_page: number;
+    pagination: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    }
     records: T[];
 }
 
@@ -229,14 +232,16 @@ export class CRUD {
 
         query.orderBy(`${entityName}.${sortField}`, sortDirection);
 
-        console.log('Generated Query:', query.getSql());
+
         const [data, total] = await query.getManyAndCount();
 
-        return {
-            total_records: total,
-            current_page: pageNumber,
-            per_page: limitNumber,
-            records: data,
+        const pagination = {
+            page: pageNumber,
+            limit: limitNumber,
+            total,
+            totalPages: Math.ceil(total / limit),
         };
+
+        return { records: data, pagination }
     }
 }

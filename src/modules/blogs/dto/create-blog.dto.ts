@@ -6,14 +6,25 @@ export class CreateBlogDto {
     @IsString()
     @MaxLength(255)
     @IsNotEmpty()
-    title: string;
+    title_ar: string;
 
     @ApiProperty({ description: 'The content of the blog' })
     @IsString()
     @IsNotEmpty()
-    description: string;
+    description_ar: string;
 
-    @ApiProperty({ type: 'string', format: 'binary', required: false })
+    @ApiProperty({ maxLength: 255, example: 'My First Blog' })
+    @IsString()
+    @MaxLength(255)
+    @IsNotEmpty()
+    title_en: string;
+
+    @ApiProperty({ description: 'The content of the blog' })
+    @IsString()
+    @IsNotEmpty()
+    description_en: string;
+
+    @ApiProperty({ type: 'string', format: 'binary' })
     @IsOptional()
-    image?: any;
+    image: any;
 }

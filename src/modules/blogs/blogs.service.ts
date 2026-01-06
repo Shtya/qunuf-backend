@@ -6,6 +6,7 @@ import { CreateBlogDto } from "./dto/create-blog.dto";
 import { UpdateBlogDto } from "./dto/update-blog.dto";
 import { deleteFile } from "src/common/utils/file.util";
 import { CRUD } from "src/common/services/crud.service";
+import { PaginationDto } from "src/common/dto/pagination.dto";
 
 
 @Injectable()
@@ -31,7 +32,16 @@ export class BlogsService {
     }
 
     async findAllCursor(cursor?: { createdAt: Date; id: string }, limit: number = 20) {
-        const queryBuilder = this.blogRepo.createQueryBuilder('blog');
+        const queryBuilder = this.blogRepo.createQueryBuilder('blog').select([
+            'blog.id',
+            'blog.created_at',
+            'blog.updated_at',
+            'blog.deleted_at',
+            'blog.title_ar',
+            'blog.title_en',
+            'blog.imagePath',
+            'blog.slug',
+        ]);
 
         return CRUD.paginateCursor({
             queryBuilder,
@@ -41,13 +51,28 @@ export class BlogsService {
         });
     }
 
+    async findMostRecent() {
+        const blog = this.blogRepo
+            .createQueryBuilder('blog')
+            .orderBy('blog.created_at', 'DESC')
+            .getOne();
+        if (!blog) throw new NotFoundException(`No blog not found`);
+
+        return blog;
+    }
+
+
     async create(dto: CreateBlogDto, imagePath: string): Promise<Blog> {
-        const slug = this.generateSlugHelper(dto.title);
+        const slug = this.generateSlugHelper(dto.title_en);
 
         const existing = await this.blogRepo.findOne({ where: { slug } });
         if (existing) {
-            throw new BadRequestException(`Blog with title "${dto.title}" already exists`)
+            throw new BadRequestException(`Blog with title "${dto.title_en}" already exists`)
         }
+        if (!imagePath) {
+            throw new BadRequestException('Image is required');
+        }
+
         const blog = this.blogRepo.create({ ...dto, imagePath: imagePath });
         return await this.blogRepo.save(blog);
     }
@@ -56,6 +81,21 @@ export class BlogsService {
         const blog = await this.blogRepo.findOne({ where: { slug } });
         if (!blog) throw new NotFoundException(`Blog with slug "${slug}" not found`);
         return blog;
+    }
+
+
+    async findPagination(query: PaginationDto) {
+        return CRUD.findAll(
+            this.blogRepo,
+            'blog',
+            '',
+            query.page,
+            query.limit,
+            query.sortBy,
+            query.sortOrder,
+            [], // relations
+            [], // search fields
+        );
     }
 
     async update(id: string, dto: UpdateBlogDto, imagePath?: string): Promise<Blog> {
@@ -67,8 +107,8 @@ export class BlogsService {
 
         // 2. Handle slug logic if title is being updated
         let newSlug = blog.slug;
-        if (dto.title && dto.title !== blog.title) {
-            newSlug = this.generateSlugHelper(dto.title); // Your regex helper
+        if (dto.title_en && dto.title_en !== blog.title_en) {
+            newSlug = this.generateSlugHelper(dto.title_en); // Your regex helper
 
             // Check if this slug is already taken by ANOTHER blog
             const slugExists = await this.blogRepo.findOne({
@@ -76,7 +116,7 @@ export class BlogsService {
             });
 
             if (slugExists) {
-                throw new BadRequestException(`A blog with the title "${dto.title}" already exists.`);
+                throw new BadRequestException(`A blog with the title "${dto.title_en}" already exists.`);
             }
         }
 

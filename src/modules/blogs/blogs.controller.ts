@@ -12,6 +12,7 @@ import {
     Query,
     Put,
     Delete,
+    BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes, ApiBody, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
@@ -21,11 +22,15 @@ import { UpdateBlogDto } from "./dto/update-blog.dto";
 import { Auth } from "src/common/decorators/auth.decorator";
 import { UserRole } from "src/common/entities/user.entity";
 import { decodeCursor, encodeCursor } from "src/common/utils/crud.util";
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { User } from "src/common/decorators/user.decorator";
+import { CRUD } from "src/common/services/crud.service";
 
 @ApiTags('Blogs')
 @Controller('blogs')
 export class BlogsController {
     constructor(private readonly blogsService: BlogsService) { }
+
 
     @Get()
     @ApiOperation({ summary: 'Get blogs with cursor pagination' })
@@ -51,6 +56,32 @@ export class BlogsController {
         return response;
     }
 
+    @Get('recent')
+    @ApiOperation({ summary: 'Get the most recent blog' })
+    @ApiResponse({
+        status: 200,
+        description: 'Returns the most recent blog without descriptions',
+    })
+    async recent() {
+
+        const blog = await this.blogsService.findMostRecent();
+
+
+        return blog;
+    }
+
+    @Get('admin')
+    @Auth(UserRole.ADMIN)
+    @ApiOperation({ summary: 'Get all blogs with pagination' })
+    @ApiResponse({ status: 200, description: 'List of blogs' })
+    async getNotifications(
+        @Query() query: PaginationDto,
+        @User() user: any
+    ) {
+        return this.blogsService.findPagination(query)
+    }
+
+
     @Get(':slug')
     @ApiOperation({ summary: 'Get a single blog by its slug' })
     @ApiResponse({ status: 200, description: 'Blog found' })
@@ -70,6 +101,10 @@ export class BlogsController {
         @Body() dto: CreateBlogDto
     ) {
         const path = file ? `uploads/images/blogs/${file.filename}` : '';
+
+        if (!file) {
+            throw new BadRequestException('Image is required');
+        }
         return this.blogsService.create(dto, path);
     }
 
