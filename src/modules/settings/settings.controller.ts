@@ -4,6 +4,7 @@ import { Settings } from 'src/common/entities/settings.entity';
 import { UserRole } from 'src/common/entities/user.entity';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { UpdateSettingsDto } from './dto/settings.dto';
 
 
 @ApiTags('Settings') // Organizes endpoints under "Settings" in Swagger UI
@@ -29,9 +30,9 @@ export class SettingsController {
     @Put()
     @Auth(UserRole.ADMIN)
     @ApiOperation({ summary: 'Update settings (Admin only)' })
-    @ApiBody({ type: Settings, description: 'Partial settings object' }) // Use a specific DTO here if possible
+    @ApiBody({ type: UpdateSettingsDto, description: 'Partial settings object' }) // Use a specific DTO here if possible
     @ApiResponse({ status: 200, description: 'Settings updated successfully.' })
-    async updateSettings(@Body() updateDto: Partial<Settings>) {
+    async updateSettings(@Body() updateDto: Partial<UpdateSettingsDto>) {
         return this.settingsService.updateSettings(updateDto);
     }
 }

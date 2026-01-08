@@ -17,6 +17,27 @@ export class Settings extends CoreEntity {
     @Column({ name: "terms_of_service_ar", type: 'text', nullable: true })
     termsOfService_ar: string | null;
 
+    @Column({ type: 'text', nullable: true })
+    address: string | null;
+
+    @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
+    latitude: number | null;
+
+    @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
+    longitude: number | null;
+
+    @Column({ name: "contact_email", type: 'varchar', length: 255, nullable: true })
+    contactEmail: string | null;
+
+    @Column({ name: 'contact_phone', type: 'varchar', length: 50, nullable: true })
+    contactPhone: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    description_ar: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    description_en: string | null;
+
     @Column({ type: 'varchar', length: 255, nullable: true })
     facebook: string | null;
 
@@ -38,18 +59,12 @@ export class Settings extends CoreEntity {
     @Column({ type: 'varchar', length: 255, nullable: true })
     youtube: string | null;
 
+    @Column({ name: "fax", type: 'varchar', length: 50, nullable: true })
+    fax: string | null;
+
     @Column({ name: "platform_percent", type: 'decimal', precision: 12, scale: 2, default: 0 })
     platformPercent: number;
 
-    @Column({ name: "contact_email", type: 'varchar', length: 255, nullable: true })
-    contactEmail: string | null;
-
-    @Column({ name: 'contact_phone', type: 'varchar', length: 50, nullable: true })
-    contactPhone: string | null;
-
     @Column({ name: 'name', type: 'varchar', length: 255, nullable: true })
     name: string | null;
-
-    @Column({ type: 'text', nullable: true })
-    address: string | null;
 }

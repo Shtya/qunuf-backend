@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Conversation } from "src/common/entities/conversation.entity";
 import { User, UserRole, UserStatus } from "src/common/entities/user.entity";
@@ -6,9 +6,6 @@ import { Not, Repository } from "typeorm";
 import { Message } from "src/common/entities/message.entity";
 import { CRUD } from "src/common/services/crud.service";
 import { AppGateway } from "src/common/websocket/app.gateway";
-import { ulid } from "ulid";
-import { faker } from '@faker-js/faker';
-
 
 @Injectable()
 export class ConversationsService {
@@ -38,6 +35,9 @@ export class ConversationsService {
             throw new NotFoundException('One or both users not found');
         }
 
+        if (part1.id === part2.id) {
+            throw new BadRequestException("Can't talk to yourself.")
+        }
         const existing = await this.conversationRepo.findOne({
             where: {
                 participantOneId: p1,
@@ -62,7 +62,7 @@ export class ConversationsService {
                 hasMore: result.hasMore
             }
             return {
-                conversation: existing,
+                conversation: { ...existing, participantOne: part1, participantTwo: part2 },
                 ...initialMessages
             };
         }
@@ -79,7 +79,10 @@ export class ConversationsService {
         const saved = await this.conversationRepo.save(conversation);
 
         return {
-            conversation: saved
+            conversation: { ...saved, participantOne: part1, participantTwo: part2 },
+            messages: [],
+            nextCursor: null,
+            hasMore: false
         }
     }
 
@@ -214,12 +217,28 @@ export class ConversationsService {
 
         const isParticipantOne = userId === conversation.participantOneId;
 
-        // 1. Reset the specific count for the reader
+
+        const globalUnreadPromise = isParticipantOne
+            ? this.conversationRepo
+                .createQueryBuilder('c')
+                .select('COALESCE(SUM(c.unreadCountOne), 0)', 'total')
+                .where('c.participantOneId = :userId', { userId })
+                .getRawOne()
+            : this.conversationRepo
+                .createQueryBuilder('c')
+                .select('COALESCE(SUM(c.unreadCountTwo), 0)', 'total')
+                .where('c.participantTwoId = :userId', { userId })
+                .getRawOne();
+
+        // 1. Reset the specific count for the readerx  
         const updateData: any = {};
+        let old = 0;
         if (isParticipantOne) {
             // Only reset if it's not already 0
+            old = conversation.unreadCountOne;
             if (conversation.unreadCountOne > 0) updateData.unreadCountOne = 0;
         } else {
+            old = conversation.unreadCountTwo;
             if (conversation.unreadCountTwo > 0) updateData.unreadCountTwo = 0;
         }
 
@@ -242,7 +261,11 @@ export class ConversationsService {
             });
         }
 
-        return { success: true };
+        // 🔹 Await the global unread count at the end
+        const result = await globalUnreadPromise;
+        const totalUnread = result ? Number(result.total) : 0;
+
+        return { success: true, totalUnread: Math.max(0, totalUnread - old) };
     }
 
 

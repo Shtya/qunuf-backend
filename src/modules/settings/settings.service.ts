@@ -2,6 +2,7 @@ import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Settings } from 'src/common/entities/settings.entity';
+import { User, UserRole } from 'src/common/entities/user.entity';
 import { Repository } from 'typeorm';
 
 @Injectable()
@@ -9,6 +10,9 @@ export class SettingsService {
     constructor(
         @InjectRepository(Settings)
         private readonly settingsRepo: Repository<Settings>,
+
+        @InjectRepository(User)
+        private userRepository: Repository<User>,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) { }
 
@@ -38,16 +42,21 @@ export class SettingsService {
     }
 
     async getPublicSettings() {
-        const settings = await this.getSettings();
+        const [settings, adminUser] = await Promise.all([
+            this.getSettings(),
+            this.userRepository.findOne({
+                where: { role: UserRole.ADMIN },
+                order: { id: 'ASC' }, // ensures first one
+                select: ['id'],
+            }),
+        ]);
 
-        const {
-            platformPercent, // Extract the secret prop here
-            ...publicData
-        } = settings;
-
-        // 3. Return only the public data
-        return publicData;
+        return {
+            ...settings,
+            adminUserId: adminUser?.id || null,
+        };
     }
+
 
     async updateSettings(updateDto: Partial<Settings>) {
         let settings = await this.settingsRepo.findOne({ where: {} });
