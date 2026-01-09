@@ -53,6 +53,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
             // ==> REQUIREMENT 2: Broadcast "Green Ball" (Online Status)
             this.broadcastStatus(user.id, 'online');
 
+            socket.emit("users:active", { users: Array.from(this.onlineUsers), timestamp: new Date(), });
         } catch (error) {
             console.error('Socket Auth Error:', error.message);
             socket.disconnect();
