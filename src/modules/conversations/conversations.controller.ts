@@ -37,8 +37,6 @@ export class ConversationsController {
         @User() user: any,
         @Body() dto: CreateConversationDto
     ) {
-        // user.id is the person initiating the chat
-        // dto.otherUserId is the target (Landlord, Tenant, or Admin)
         return this.conversationsService.getOrCreateConversation(user.id, dto.otherUserId);
     }
 

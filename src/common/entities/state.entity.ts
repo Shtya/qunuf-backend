@@ -9,4 +9,7 @@ export class State extends CoreEntity {
 
     @Column({ type: 'varchar', length: 255, unique: true })
     name_ar: string;
+
+    @Column({ unique: true })
+    region_code: string;
 }

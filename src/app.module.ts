@@ -22,6 +22,7 @@ import { BlogsModule } from './modules/blogs/blogs.module';
 import { CountriesModule } from './modules/countries/countries.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { PropertiesModule } from './modules/properties/properties.module';
 
 @Module({
   imports: [
@@ -74,7 +75,8 @@ import { NotificationModule } from './modules/notification/notification.module';
     BlogsModule,
     CountriesModule,
     ConversationsModule,
-    NotificationModule
+    NotificationModule,
+    PropertiesModule
   ],
   controllers: [AppController, AuthController],
   providers: [CustomValidationPipe],

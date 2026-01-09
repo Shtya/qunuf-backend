@@ -17,6 +17,7 @@ export class NotificationService {
 
 
   async markAsRead(userId: string, notificationId: string) {
+
     const notification = await this.notificationRepository.findOne({
       where: { id: notificationId, userId },
     });
@@ -25,6 +26,7 @@ export class NotificationService {
       notification.isRead = true;
       await this.notificationRepository.save(notification);
     }
+
 
     return notification;
   }
@@ -37,7 +39,6 @@ export class NotificationService {
       .where('userId = :userId', { userId })
       .andWhere('isRead = :isRead', { isRead: false })
       .execute();
-
 
     await this.userRepository.update(userId, {
       notificationUnreadCount: 0

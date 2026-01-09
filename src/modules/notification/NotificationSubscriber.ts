@@ -8,14 +8,19 @@ import {
     InsertEvent,
     UpdateEvent,
     RemoveEvent,
+    DataSource,
 } from "typeorm";
 
 @EventSubscriber()
 export class NotificationSubscriber
     implements EntitySubscriberInterface<Notification> {
     constructor(
+        dataSource: DataSource,
         private readonly chatGateway: AppGateway,
-    ) { }
+    ) {
+        dataSource.subscribers.push(this);
+
+    }
 
     // Tell TypeORM which entity we listen to
     listenTo(): Function {
@@ -39,6 +44,10 @@ export class NotificationSubscriber
 
 
     async afterUpdate(event: UpdateEvent<Notification>) {
+        if (!event.databaseEntity || !event.entity) {
+            return;
+        }
+
         // If isRead changed from false to true
         if (event.databaseEntity.isRead === false && event?.entity?.isRead === true) {
             await event.manager.decrement(User, { id: event.databaseEntity.userId }, 'notificationUnreadCount', 1);
@@ -46,6 +55,10 @@ export class NotificationSubscriber
     }
 
     async afterRemove(event: RemoveEvent<Notification>) {
+        if (!event.databaseEntity || !event.entity) {
+            return;
+        }
+
         if (event.databaseEntity && !event.databaseEntity.isRead) {
             await event.manager.decrement(User, { id: event.databaseEntity.userId }, 'notificationUnreadCount', 1);
         }

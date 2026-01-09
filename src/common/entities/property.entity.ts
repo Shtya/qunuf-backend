@@ -1,10 +1,59 @@
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { CoreEntity } from './coreEntity';
 import { User } from './user.entity';
-import { PropertySubtype } from './property-subtype.entity';
-import { PropertyType } from './property-type.entity';
 import { State } from './state.entity';
+// --- Enums المحدثة بقيم Small Case ---
 
+export enum PropertyType {
+    COMMERCIAL = 'commercial',
+    RESIDENTIAL = 'residential',
+}
+
+export enum ResidentialSubType {
+    APARTMENT = 'apartment',
+    VILLA = 'villa',
+    FLOOR = 'floor',
+    ROOM = 'room',
+    POPULAR_HOUSE = 'popular_house',
+    ANNEX = 'annex',
+    LABOR_HOUSING = 'labor_housing',
+    INDIVIDUAL_HOUSING = 'individual_housing',
+    DRIVER_ROOM = 'driver_room',
+    FAMILY_HOUSING = 'family_housing',
+    OTHER = 'other',
+}
+
+export enum CommercialSubType {
+    OFFICE = 'office',
+    RETAIL_STORE = 'retail_store',
+    SHOWROOM = 'showroom',
+    WAREHOUSE = 'warehouse',
+    WORKSHOP = 'workshop',
+    COMMERCIAL_CENTER = 'commercial_center',
+    COMMERCIAL_BUILDING = 'commercial_building',
+    COMMERCIAL_LABOR_HOUSING = 'commercial_labor_housing',
+    KIOSK = 'kiosk',
+    LAND = 'land',
+    OTHER = 'other',
+}
+
+export enum OwnershipType {
+    OWNER = 'owner',
+    REPRESENTATIVE = 'representative',
+}
+
+export enum PaymentType {
+    MONTHLY = 'monthly',
+    QUARTERLY = 'quarterly',
+    SEMI_ANNUAL = 'semi_annual',
+    ANNUAL = 'annual',
+}
+
+export enum DocumentType {
+    ELECTRONIC_DEED = 'electronic_deed',
+    REAL_ESTATE_REGISTRATION = 'real_estate_registration',
+    OTHER = 'other',
+}
 
 export enum RentType {
     MONTHLY = 'monthly',
@@ -12,122 +61,32 @@ export enum RentType {
 }
 
 export enum PropertyStatus {
-    PENDING = 'pending',
-    ACTIVE = 'active',
-    INACTIVE = 'inactive',
+    PENDING = 'pending',     // بانتظار المراجعة (بعد الإضافة من المالك)
+    ACTIVE = 'active',       // مفعّل وظاهر للجميع
+    INACTIVE = 'inactive',   // معطل (مؤقتاً)
+    REJECTED = 'rejected',   // مرفوض من الإدارة
+    ARCHIVED = 'archived',   // مؤرشف (محذوف منطقياً)
 }
-
-export enum FurnishedType {
-    FURNISHED = 'furnished',
-    UNFURNISHED = 'Unfurnished',
-}
+// --- Entity المحدثة بأسماء الأعمدة snake_case ---
 
 @Entity('properties')
 export class Property extends CoreEntity {
-    @Column({ type: 'varchar', length: 255 })
+    @Column({ name: 'name' })
     name: string;
 
-    @Column({ name: 'landlord_id', })
-    landlordId: string;
-
-    @ManyToOne(() => User)
-    @JoinColumn({ name: 'landlord_id' })
-    landlord: User;
-
-    @Column({ type: 'text' })
+    @Column({ type: 'text', name: 'description' })
     description: string;
 
-    @Column({ type: 'text', name: 'additionalDetails' })
+    @Column({ type: 'text', nullable: true, name: 'additional_details' })
     additionalDetails: string;
-
-    @Column({ type: 'decimal', precision: 12, scale: 2 })
-    price: number;
-
-    @Column({
-        type: 'enum',
-        enum: RentType,
-        default: RentType.MONTHLY,
-        name: 'rent_type',
-    })
-    rentType: RentType;
-
-    @Column({ type: 'int' })
-    bedrooms: number;
-
-    @Column({ type: 'int' })
-    bathrooms: number;
-
-    @Column({ type: 'int' })
-    kitchen: number;
-
-    @Column({ type: 'int' })
-    parking: number;
-
-    @Column({ type: 'int', name: 'year_built' })
-    yearBuilt: number;
-
-    @Column({ type: 'int', name: 'square_feet' })
-    squareFeet: number;
-
-    @Column({ type: 'int' })
-    garages: number;
-
-    @Column({ type: 'int', name: 'max_guests', nullable: true })
-    maxGuests: number | null;
 
     @Column({
         type: 'enum',
         enum: PropertyStatus,
         default: PropertyStatus.PENDING,
-        name: 'status',
+        name: 'status'
     })
     status: PropertyStatus;
-
-    @Column({ type: 'boolean', default: false })
-    rented: boolean;
-
-    @Column({
-        type: 'enum',
-        enum: FurnishedType,
-        name: 'furnished_type',
-    })
-    furnishedType: FurnishedType;
-
-    @Column({ name: 'property_type_id', })
-    propertyTypeId: string;
-
-    @ManyToOne(() => PropertyType)
-    @JoinColumn({ name: 'property_type_id' })
-    propertyType: PropertyType;
-
-    @Column({ name: 'property_subtype_id', })
-    propertySubtypeId: string;
-
-    @ManyToOne(() => PropertySubtype)
-    @JoinColumn({ name: 'property_subtype_id' })
-    propertySubtype: PropertySubtype;
-
-    @Column({ type: 'jsonb' })
-    images: { url: string; is_primary: boolean }[];
-
-    @Column({ type: 'jsonb' })
-    features: string[];
-
-    @Column({ name: 'state_id', })
-    stateId: string;
-
-    @ManyToOne(() => State)
-    @JoinColumn({ name: 'state_id' })
-    state: State;
-
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    address: string | null;
-
-    @Column({ type: 'decimal', precision: 10, scale: 8 })
-    latitude: number;
-
-    @Column({ type: 'decimal', precision: 11, scale: 8 })
-    longitude: number;
 
     @Column({ type: 'jsonb', nullable: true, name: 'education_institutions' })
     educationInstitutions: {
@@ -142,4 +101,129 @@ export class Property extends CoreEntity {
         type: string;
         distance_km: number;
     }[] | null;
+
+    @Column({ type: 'jsonb', name: 'images' })
+    images: { url: string; is_primary: boolean }[];
+
+    @Column({ type: 'enum', enum: PropertyType, name: 'property_type' })
+    propertyType: PropertyType;
+
+    @Column({
+        type: 'varchar',
+        length: 50,
+        name: 'sub_type',
+        comment: 'Stores values from ResidentialSubType or CommercialSubType'
+    })
+    subType: ResidentialSubType | CommercialSubType | string;
+
+    @Column({ type: 'int', nullable: true, name: 'capacity' })
+    capacity: number;
+
+    @Column({ default: false, name: 'is_furnished' })
+    isFurnished: boolean;
+
+    @Column({ default: false, name: 'is_rented' })
+    isRented: boolean;
+
+    @Column({ name: 'property_number' })
+    propertyNumber: string;
+
+    @Column('decimal', { precision: 10, scale: 2, name: 'area' })
+    area: number;
+
+    @Column('decimal', { precision: 10, scale: 2, name: 'rent_price' })
+    rentPrice: number;
+
+    @Column('decimal', { precision: 10, scale: 2, name: 'security_deposit' })
+    securityDeposit: number;
+
+    @Column({ type: 'date', nullable: true, name: 'construction_date' })
+    constructionDate: Date;
+
+    @Column({ type: 'enum', enum: RentType, name: 'rent_type' })
+    rentType: RentType;
+
+    @Column({ type: 'enum', enum: PaymentType, name: 'payment_type' })
+    paymentType: PaymentType;
+
+    @Column({ nullable: true, name: 'insurance_policy_number' })
+    insurancePolicyNumber: string;
+
+    @Column({ type: 'enum', enum: OwnershipType, name: 'ownership_type' })
+    ownershipType: OwnershipType;
+
+    @Column({ nullable: true, name: 'complex_name' })
+    complexName: string;
+
+    @Column({ type: 'enum', enum: DocumentType, name: 'document_type' })
+    documentType: DocumentType;
+
+    @Column({ type: 'date', name: 'document_issue_date' })
+    documentIssueDate: Date;
+
+    @Column({ name: 'document_number' })
+    documentNumber: string;
+
+    @Column({ name: 'owner_id_number' })
+    ownerIdNumber: string;
+
+    @Column({ name: 'issued_by' })
+    issuedBy: string;
+
+    @Column({ name: 'document_image_path' })
+    documentImagePath: string;
+
+    @Column({ name: 'national_address_code' })
+    nationalAddressCode: string;
+
+    @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true, name: 'latitude' })
+    latitude: number;
+
+    @Column({ type: 'decimal', precision: 11, scale: 6, nullable: true, name: 'longitude' })
+    longitude: number;
+
+    // Example: "Riyadh"
+    @ManyToOne(() => State, { nullable: false, eager: true })
+    @JoinColumn({ name: 'state_id' })
+    state: State;
+
+    @Column({ type: 'json', nullable: true, name: 'facilities' })
+    facilities: {
+        livingRooms?: number;
+        parking?: number;
+        elevators?: number;
+        bathrooms?: number;
+        securityEntrances?: number;
+        bedrooms?: number;
+        maidRoom?: boolean;
+        kitchen?: number;
+        store?: number;
+        backyard?: boolean;
+        centralAC?: boolean;
+        desertAC?: boolean;
+        majlis?: number;
+        rooms?: number;
+    };
+
+    @Column({ nullable: true, name: 'gas_meter_number' })
+    gasMeterNumber: string;
+
+    @Column({ nullable: true, name: 'electricity_meter_number' })
+    electricityMeterNumber: string;
+
+    @Column({ nullable: true, name: 'water_meter_number' })
+    waterMeterNumber: string;
+
+    @Column('simple-array', { nullable: true, name: 'features' })
+    features: string[];
+
+    @ManyToOne(() => User, (user) => user.id)
+    @JoinColumn({ name: 'user_id' }) // تأكد من وجود الـ decorator هذا لربط الـ FK
+    userId: string | null;
+
+    @Column({ type: 'uuid', name: 'state_id', nullable: true })
+    stateId: string | null;
+
+
+
 }
