@@ -1,8 +1,9 @@
 
-import { Entity, Column, OneToMany, Relation, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, Column, OneToMany, Relation, ManyToOne, JoinColumn, OneToOne } from "typeorm";
 import { CoreEntity } from './coreEntity';
 import type { Session } from "./session.entity";
 import { Country } from "./country.entity";
+import { Address } from "./address.entity";
 
 export enum UserRole {
     ADMIN = 'admin',
@@ -77,49 +78,66 @@ export class User extends CoreEntity {
         default: true,
         comment: 'Flag to enable/disable notifications for this user',
         name: 'notifications_enabled',
+        select: false
     })
     notificationsEnabled: boolean;
 
     @Column({ type: 'timestamptz', nullable: true, name: 'last_login' })
     lastLogin: Date | null;
 
-
     @ManyToOne(() => Country, { nullable: true })
-    @JoinColumn({ name: 'country_id' })
-    country: Country | null;   // nationality
+    @JoinColumn({ name: 'nationalityId' })
+    nationality: Country | null;   // nationality
 
-    @Column({ name: 'country_id', nullable: true })
-    countryId: string | null;
+    @Column({ name: 'nationalityId', nullable: true })
+    nationalityId: string | null;
 
     @Column({
         type: 'enum',
         enum: IdentityType,
         nullable: true,
         name: 'identity_type',
+        select: false
     })
     identityType: IdentityType | null;
 
-    @Column({ type: 'varchar', length: 255, nullable: true, name: 'identity_number' })
+    @Column({ type: 'varchar', length: 255, nullable: true, name: 'identity_number', select: false })
     identityNumber: string | null;
 
+    @Column({ type: 'uuid', name: 'identity_issue_country_id', nullable: true })
+    identityIssueCountryId: string | null;
+
     @ManyToOne(() => Country, { nullable: true })
-    @JoinColumn({ name: 'identity_issue_country_id' })
+    @JoinColumn({ name: 'identity_issue_country_id', })
     identityIssueCountry: Country | null;
 
-    @Column({ type: 'varchar', length: 255, nullable: true, name: 'identity_other_type' })
+    @Column({ type: 'varchar', length: 255, nullable: true, name: 'identity_other_type', select: false })
     identityOtherType: string | null;
 
-    @Column({ type: 'date', nullable: true, name: 'birth_date' })
+    @Column({ type: 'date', nullable: true, name: 'birth_date', select: false })
     birthDate: Date | null;
 
-    @Column({ type: 'varchar', length: 20, nullable: true, name: 'phone_number' })
+    @Column({ type: 'varchar', length: 20, nullable: true, name: 'phone_number', select: false })
     phoneNumber: string | null;
 
     @Column({ name: 'notification_unread_count', default: 0, select: false })
     notificationUnreadCount: number;
 
-    @Column({ type: 'varchar', length: 1024, nullable: true })
+    @Column({ name: 'image_path', type: 'varchar', length: 1024, nullable: true })
     imagePath: string | null;
+
+    @Column({ name: 'pending_eeail', type: 'varchar', nullable: true })
+    pendingEmail: string | null;
+
+    @Column({ name: 'pending_email_code', type: 'varchar', nullable: true, select: false })
+    pendingEmailCode: string | null;
+
+    @Column({ name: 'last_email_change_sent_at', type: 'varchar', nullable: true, select: false })
+    lastEmailChangeSentAt: Date | null;
+
+    @OneToOne("Address", "User", { cascade: true, nullable: true })
+    @JoinColumn({ name: 'address_id' })
+    address?: Relation<Address | null>;
 
     @OneToMany('Session', 'User')
     sessions: Relation<Session[]>;

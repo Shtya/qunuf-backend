@@ -41,7 +41,7 @@ import { NotificationModule } from './modules/notification/notification.module';
           autoLoadEntities: true,
           synchronize: process.env.NODE_ENV === 'development',
           migrations: [__dirname + '/database/migration/**/*{.js,.ts}'],
-          logging: 'all',
+          logging: 'all'
         })
       },
     }),

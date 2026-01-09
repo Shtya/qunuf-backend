@@ -62,4 +62,43 @@ export class EmailService {
             // any context needed by template
         });
     }
+
+    async sendEmailChangeConfirmation(
+        newEmail: string,
+        name: string,
+        userId: string,
+        code: string,
+    ) {
+
+        const confirmLink =
+            `${process.env.BACKEND_URL}/api/v1/auth/confirm-email-change` +
+            `?userId=${userId}&pendingEmail=${encodeURIComponent(newEmail)}&code=${code}`;
+
+        return this.sendMail(newEmail, `Confirm your email change`, 'confirm-email-change', {
+            name,
+            confirmLink,
+        }
+        );
+    }
+
+    async sendEmailChangeNotification(
+        oldEmail: string,
+        name: string,
+    ) {
+
+        return this.sendMail(oldEmail, `Your email has been changed`, 'email-changed-notification', {
+            name,
+        });
+    }
+
+    async sendPasswordChangeNotification(
+        email: string,
+        name: string,
+    ) {
+
+        await this.sendMail(email, `Password Changed`, 'password-changed-notification', {
+            name,
+        });
+    }
+
 }

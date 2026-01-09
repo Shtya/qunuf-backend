@@ -1,51 +1,98 @@
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsString, IsOptional, MaxLength, Matches, IsDate, IsEnum, MinLength, Validate, ValidateIf, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, ValidateIf, Matches, IsDate, Validate, MinLength } from 'class-validator';
 import { IdentityType } from 'src/common/entities/user.entity';
 
-export class UpdateUserDto {
+export class UpdateAddressDto {
+    @ApiProperty({ example: 'b0256268-80f6-41f2-9856-78e7636e0d37', description: 'UUID of the state' })
+    @IsOptional()
     @IsString()
-    @IsNotEmpty({ message: 'Name is required' })
-    @MaxLength(50, { message: 'Name must be at most 50 characters long' })
+    stateId: string;
+
+    @ApiProperty({ example: 'Riyadh' })
+    @IsOptional()
+    @IsString()
+    city: string;
+
+    @ApiProperty({ example: 'King Fahd Road' })
+    @IsOptional()
+    @IsString()
+    streetName: string;
+
+    @ApiProperty({ example: '1234' })
+    @IsOptional()
+    @IsString()
+    buildingNumber: string;
+
+    @ApiPropertyOptional({ example: '12211' })
+    @IsOptional()
+    @IsString()
+    postalCode?: string;
+
+    @ApiPropertyOptional({ example: '7890' })
+    @IsOptional()
+    @IsString()
+    additionalNumber?: string;
+}
+
+export class UpdateUserDto {
+    @ApiProperty({ example: 'Ahmad Al-Saud' })
+    @IsString()
+    @IsOptional()
+    @MaxLength(50)
     name: string;
 
+    @ApiProperty({ example: '+966501234567', description: 'Saudi Phone Number' })
     @Matches(/^(009665|9665|\+9665|05|5)(5|0|3|6|4|9|1|8|7)([0-9]{7})$/, {
         message: 'Invalid Saudi phone number format',
     })
     phoneNumber: string;
 
+    @ApiProperty({ example: '1990-01-01', description: 'Birth date (YYYY-MM-DD)' })
     @Type(() => Date)
-    @IsNotEmpty({ message: 'Birth date is required' })
+    @IsOptional()
     @IsDate()
-    @Validate(val => {
+    @Validate((val) => {
         const eighteenYearsAgo = new Date();
         eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
         return val <= eighteenYearsAgo;
     }, { message: 'User must be at least 18 years old' })
     birthDate: Date;
 
-
+    @ApiProperty({ enum: IdentityType, example: IdentityType.NATIONAL_ID })
     @IsEnum(IdentityType, { message: 'Invalid identity type' })
-    @IsNotEmpty({ message: 'Indetity type is required' })
+    @IsOptional()
     identityType: IdentityType;
 
-    @ValidateIf(o => o.identityType === IdentityType.OTHER)//should be less than .... 
-    @IsString({ message: 'Identity other type must be a string' })
-    @IsNotEmpty({ message: 'Identity other type is required when identityType is OTHER' })
-    identityOtherType: string;
+    @ApiPropertyOptional({ example: 'Special Passport' })
+    @ValidateIf((o) => o.identityType === IdentityType.OTHER)
+    @IsString()
+    @IsOptional()
+    identityOtherType?: string;
 
-
-    @IsString()//should be ... for ach type
-    @IsNotEmpty({ message: 'ID is required' })
-    @Matches(/^[a-zA-Z0-9]*$/, { message: 'Identity number must contain only letters and numbers' })
+    @ApiProperty({ example: '1023456789' })
+    @IsString()
+    @IsOptional()
+    @Matches(/^[a-zA-Z0-9]*$/)
     @MinLength(3)
     @MaxLength(20)
     identityNumber: string;
 
-    // @ValidateIf(o =>
-    //     o.identityType === IdentityType.GCC_ID ||
-    //     o.identityType === IdentityType.PASSPORT ||
-    //     o.identityType === IdentityType.OTHER
-    // )
-    // @IsNotEmpty({ message: 'Identity issue country is required for GCC_ID, PASSPORT, and OTHER' })
-    // identityIssueCountry: number; // FK to Country entity (country_id)
+    @ApiPropertyOptional({ example: 'a1111111-2222-3333-4444-555555555555' })
+    @IsOptional()
+    @IsString()
+    identityIssueCountryId?: string;
+
+    @ApiPropertyOptional({ example: 'b1111111-2222-3333-4444-555555555555' })
+    @IsOptional()
+    @IsString()
+    nationalityId?: string;
+
+    @ApiPropertyOptional({ type: UpdateAddressDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => UpdateAddressDto)
+    address?: UpdateAddressDto;
 }
+
+export class UpdateUserProfileDto extends PartialType(UpdateUserDto) { }

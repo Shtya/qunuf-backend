@@ -12,7 +12,6 @@ import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import { EmailService } from '../email/email.service';
 import { v4 as uuidv4 } from 'uuid';
-import { Session } from "src/common/entities/session.entity";
 
 
 export interface JwtPayload {
@@ -39,10 +38,46 @@ export class AuthService {
     CODE_EXPIRE = 24;
     RESEND_TIME = 30;
     RESET_EXPIRE_HOURS = 1; // reset token valid for 1 hour
+    RESEND_COOLDOWN_SECONDS = 30;
 
     async login(loginDto: LoginDto, req: Request) {
         // 1) Validate user credentials
-        const user = await this.usersService.validateUser(loginDto.email, loginDto.password);
+        const user = await this.userRepository.findOne({
+            where: { email: loginDto.email },
+            relations: [
+                'address',
+                'nationality',
+                'identityIssueCountry'
+            ],
+            select: {
+                // Include general info (default true)
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                status: true,
+                imagePath: true,
+                lastLogin: true,
+                pendingEmail: true,
+                // Explicitly select "select: false" fields
+                passwordHash: true,
+                phoneNumber: true,
+                birthDate: true,
+                identityType: true,
+                identityOtherType: true,
+                identityNumber: true,
+                notificationsEnabled: true,
+                created_at: true,
+                updated_at: true,
+                deleted_at: true
+            }
+        });
+
+        if (!user) throw new UnauthorizedException('Invalid credentials');
+
+        // 2) Validate password
+        const isMatch = await bcrypt.compare(loginDto.password, user.passwordHash);
+        if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
         // 2) Check user status
         switch (user.status) {
@@ -75,14 +110,7 @@ export class AuthService {
             {
                 accessToken,
                 refreshToken,
-                user: {
-                    id: user.id,
-                    email: user.email,
-                    name: user.name,
-                    role: user.role,
-                    status: user.status,
-                    lastLogin: user.lastLogin,
-                },
+                user: this.usersService.maskSensitiveUserInfo(user),
             }
         );
     }
@@ -148,9 +176,9 @@ export class AuthService {
         // Prevent resend within RESEND_TIME seconds
         if (
             user.emailVerificationSentAt &&
-            now.getTime() - user.emailVerificationSentAt.getTime() < this.RESEND_TIME * 1000
+            now.getTime() - new Date(user.emailVerificationSentAt).getTime() < this.RESEND_TIME * 1000
         ) {
-            const elapsed = (now.getTime() - user.emailVerificationSentAt.getTime()) / 1000;
+            const elapsed = (now.getTime() - new Date(user.emailVerificationSentAt).getTime()) / 1000;
             const remaining = Math.ceil(this.RESEND_TIME - elapsed);
             throw new BadRequestException(`Please wait ${remaining} seconds before requesting another verification email`);
         }
@@ -204,9 +232,9 @@ export class AuthService {
         // Prevent resend within RESEND_TIME seconds
         if (
             user.lastResetPasswordSentAt &&
-            now.getTime() - user.lastResetPasswordSentAt.getTime() < this.RESEND_TIME * 1000
+            now.getTime() - new Date(user.lastResetPasswordSentAt).getTime() < this.RESEND_TIME * 1000
         ) {
-            const elapsed = (now.getTime() - user.lastResetPasswordSentAt.getTime()) / 1000;
+            const elapsed = (now.getTime() - new Date(user.lastResetPasswordSentAt).getTime()) / 1000;
             const remaining = Math.ceil(this.RESEND_TIME - elapsed);
 
             throw new BadRequestException(`Please wait ${remaining} seconds before requesting another reset email`);
@@ -395,13 +423,7 @@ export class AuthService {
         return { message: 'Logged out from all sessions' };
     }
 
-    // Get current user by ID
-    async getCurrentUser(userId: string) {
-        const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) throw new NotFoundException('User not found');
 
-        return user;
-    }
 
     // Deactivate account (set status to INACTIVE)
     async deactivateAccount(userId: string) {
@@ -412,5 +434,170 @@ export class AuthService {
         await this.userRepository.save(user);
 
         return { message: 'Account deactivated successfully' };
+    }
+
+
+    async getUser(userId: string) {
+        return this.usersService.getUser(userId);
+    }
+
+    async requestEmailChange(userId: string, newEmail: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        // Check if new email is already used
+        const emailExists = await this.userRepository.findOne({
+            where: { email: newEmail },
+            select: [
+                'id',
+                'name',
+                'email',
+                'pendingEmail',
+                'pendingEmailCode',
+                'lastEmailChangeSentAt',
+            ],
+        });
+        if (emailExists) throw new BadRequestException('Email already in use');
+
+        // Cooldown check
+        if (user.lastEmailChangeSentAt) {
+            const currentTimestamp = Date.now();
+            const lastSentTime = new Date(user.lastEmailChangeSentAt).getTime();
+            const timeElapsedSeconds = (currentTimestamp - lastSentTime) / 1000;
+
+            if (timeElapsedSeconds < this.RESEND_COOLDOWN_SECONDS) {
+                const remainingSeconds = Math.ceil(this.RESEND_COOLDOWN_SECONDS - timeElapsedSeconds);
+                throw new ForbiddenException(`Please wait ${remainingSeconds} seconds before resending email`);
+            }
+        }
+
+        // Update last sent timestamp
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+        user.lastEmailChangeSentAt = new Date();
+        user.pendingEmail = newEmail;
+        user.pendingEmailCode = code;
+
+        await this.userRepository.save(user);
+
+        // Send confirmation email
+        await this.emailService.sendEmailChangeConfirmation(newEmail, user.name, user.id, code);
+
+        return { message: 'Confirmation email sent to new email address' };
+    }
+
+    async resendEmailConfirmation(userId: string) {
+        const user = await this.userRepository.findOne({
+            where: { id: userId }, select: [
+                'id',
+                'name',
+                'email',
+                'pendingEmail',
+                'pendingEmailCode',
+                'lastEmailChangeSentAt',
+            ],
+        });
+        if (!user || !user.pendingEmail || !user.pendingEmailCode) {
+            throw new BadRequestException('No pending email change found');
+        }
+
+        // Cooldown check
+        if (user.lastEmailChangeSentAt) {
+            const currentTimestamp = Date.now();
+            const lastSentTime = new Date(user.lastEmailChangeSentAt).getTime();
+            const timeElapsedSeconds = (currentTimestamp - lastSentTime) / 1000;
+
+            if (timeElapsedSeconds < this.RESEND_COOLDOWN_SECONDS) {
+                const remainingSeconds = Math.ceil(this.RESEND_COOLDOWN_SECONDS - timeElapsedSeconds);
+                throw new ForbiddenException(`Please wait ${remainingSeconds} seconds before resending email`);
+            }
+        }
+
+        user.lastEmailChangeSentAt = new Date()
+
+        await this.userRepository.save(user);
+
+        await this.emailService.sendEmailChangeConfirmation(
+            user.pendingEmail,
+            user.name,
+            user.id,
+            user.pendingEmailCode
+        );
+
+        return { message: 'Confirmation email resent' };
+    }
+
+    async cancelEmailChange(userId: string) {
+        const user = await this.userRepository.findOne({
+            where: { id: userId }, select: [
+                'id',
+                'name',
+                'email',
+                'pendingEmail',
+                'pendingEmailCode',
+                'lastEmailChangeSentAt',
+            ],
+        });
+        if (!user) throw new NotFoundException('User not found');
+
+        user.pendingEmail = null;
+        user.pendingEmailCode = null;
+        user.lastEmailChangeSentAt = null;
+
+        await this.userRepository.save(user);
+        return { message: 'Pending email change canceled' };
+    }
+
+    async confirmEmailChange(userId: string, pendingEmail: string, code: string) {
+        const user = await this.userRepository.findOne({
+            where: { id: userId }, select: [
+                'id',
+                'name',
+                'email',
+                'pendingEmail',
+                'pendingEmailCode',
+                'lastEmailChangeSentAt',
+            ],
+        });
+        if (!user) throw new NotFoundException('User not found');
+
+        if (user.pendingEmail !== pendingEmail || user.pendingEmailCode !== code) {
+            throw new BadRequestException('Invalid code or pending email');
+        }
+
+        // Check if email is now used
+        const emailExists = await this.userRepository.findOne({ where: { email: pendingEmail } });
+        if (emailExists) throw new BadRequestException('Email already in use');
+
+        const oldEmail = user.email;
+        user.email = pendingEmail;
+        user.pendingEmail = null;
+        user.pendingEmailCode = null;
+        user.lastEmailChangeSentAt = null;
+
+        await this.userRepository.save(user);
+
+        // Send password change notification to the user
+        await this.emailService.sendEmailChangeNotification(oldEmail, user.name);
+        return { message: 'Email successfully updated' };
+    }
+
+
+
+    async changePassword(userId: string, currentPassword: string, newPassword: string) {
+        const user = await this.userRepository.createQueryBuilder('user').addSelect('user.passwordHash').where('user.id = :id', { id: userId }).getOne();
+
+        if (!user) throw new NotFoundException('User not found');
+
+        const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isMatch) throw new UnauthorizedException('Current password is incorrect');
+        const hashed = await bcrypt.hash(newPassword, 10);
+        user.passwordHash = hashed; // your entity hook hashes on save (existing logic)
+        await this.userRepository.save(user);
+
+        // Send password change notification to the user
+        await this.emailService.sendPasswordChangeNotification(user.email, user.name);
+
+        return { message: 'Password changed successfully' };
     }
 }

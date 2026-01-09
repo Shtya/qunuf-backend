@@ -7,6 +7,8 @@ import { ResetPasswordDto } from './dto/resetPassword.dto';
 import { User } from 'src/common/decorators/user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiBadRequestResponse, ApiUnauthorizedResponse, ApiNotFoundResponse } from '@nestjs/swagger';
+import { RequestEmailChangeDto } from './dto/request-email-change-dto ';
+import { ChangePasswordDto } from './dto/change-password-dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -112,7 +114,7 @@ export class AuthController {
     @ApiNotFoundResponse({ description: 'User not found' })
     @ApiUnauthorizedResponse({ description: 'Unauthorized' })
     async getCurrentUser(@User() user: any) {
-        return this.authService.getCurrentUser(user.id);
+        return this.authService.getUser(user.id);
     }
 
 
@@ -126,6 +128,71 @@ export class AuthController {
         return this.authService.deactivateAccount(user.id);
     }
 
+
+    @Post('request-email-change')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Request email change' })
+    @ApiResponse({ status: 200, description: 'Email change confirmation sent' })
+    @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+    async requestEmailChange(
+        @User() user: any,
+        @Body() dto: RequestEmailChangeDto,
+    ) {
+        return this.authService.requestEmailChange(user.id, dto.newEmail);
+    }
+
+    @Post('resend-email-confirmation')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Resend email change confirmation' })
+    @ApiResponse({ status: 200, description: 'Confirmation email resent' })
+    @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+    async resendEmailConfirmation(@User() user: any) {
+        return this.authService.resendEmailConfirmation(user.id);
+    }
+
+    @Post('cancel-email-change')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Cancel pending email change' })
+    @ApiResponse({ status: 200, description: 'Email change cancelled' })
+    @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+    async cancelEmailChange(@User() user: any) {
+        return this.authService.cancelEmailChange(user.id);
+    }
+
+    @Get('confirm-email-change')
+    @ApiOperation({ summary: 'Confirm email change via email link' })
+    async confirmEmailChange(
+        @Query('userId') userId: string,
+        @Query('pendingEmail') pendingEmail: string,
+        @Query('code') code: string,
+        @Res() res: any,
+    ) {
+        try {
+            await this.authService.confirmEmailChange(userId, pendingEmail, code);
+            return res.redirect(process.env.FRONTEND_URL);
+        } catch (err) {
+            return res.redirect(
+                `${process.env.FRONTEND_URL}/auth/sign-in?error=confirmation_failed`,
+            );
+        }
+    }
+
+
+    @Put('change-password')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Change account password' })
+    @ApiResponse({ status: 200, description: 'Password changed successfully' })
+    @ApiUnauthorizedResponse({ description: 'Unauthorized or invalid password' })
+    async changePassword(
+        @User() user: any,
+        @Body() dto: ChangePasswordDto,
+    ) {
+        return this.authService.changePassword(
+            user.id,
+            dto.currentPassword,
+            dto.newPassword,
+        );
+    }
 
 
 }
