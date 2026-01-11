@@ -23,6 +23,10 @@ import { CountriesModule } from './modules/countries/countries.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { PropertiesModule } from './modules/properties/properties.module';
+import { ContractsModule } from './modules/contracts/contracts.module';
+import { ContractAutoTerminatorService } from './common/backgroundServices/contract_auto_terminator_service';
+import { ContractsService } from './modules/contracts/contracts.service';
+import { ContractAutoRenewTerminatorService } from './common/backgroundServices/contact_auto_renew_terminator_service';
 
 @Module({
   imports: [
@@ -76,9 +80,10 @@ import { PropertiesModule } from './modules/properties/properties.module';
     CountriesModule,
     ConversationsModule,
     NotificationModule,
-    PropertiesModule
+    PropertiesModule,
+    ContractsModule
   ],
   controllers: [AppController, AuthController],
-  providers: [CustomValidationPipe],
+  providers: [CustomValidationPipe, ContractAutoTerminatorService, ContractAutoRenewTerminatorService],
 })
 export class AppModule { }

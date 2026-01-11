@@ -11,6 +11,8 @@ import { PropertyFilterDto } from './dto/property-filter.dto';
 import { CRUD, CustomPaginatedResponse } from 'src/common/services/crud.service';
 import { State } from 'src/common/entities/state.entity';
 import { GuestPropertySearchDto } from './dto/guest-property-search.dto';
+import { NotificationService } from '../notification/notification.service';
+import { trimText } from 'src/common/utils/helpers';
 
 @Injectable()
 export class PropertiesService {
@@ -23,6 +25,7 @@ export class PropertiesService {
 
         @InjectRepository(State)
         public stateRepo: Repository<State>,
+        private notificationService: NotificationService,
     ) { }
 
 
@@ -54,7 +57,24 @@ export class PropertiesService {
             documentImagePath: docPath,
         });
 
-        return await this.propertyRepo.save(property);
+        const admin = await this.userRepository.findOne({
+            where: { role: UserRole.ADMIN },
+            select: ['id']
+        });
+        const savedProperty = await this.propertyRepo.save(property);
+        // 2. إرسال الإشعار إذا تم العثور على مسؤول
+        if (admin) {
+            await this.notificationService.createNotification(
+                admin.id,
+                'NEW_PROPERTY_SUBMITTED',
+                'New Property Awaiting Review',
+                `A new property listing "${trimText(savedProperty.name)}" has been submitted and is awaiting approval.`,
+                'property',
+                savedProperty.id
+            );
+        }
+
+        return savedProperty;
 
     }
 
@@ -104,7 +124,26 @@ export class PropertiesService {
         Object.assign(property, dto);
         property.status = PropertyStatus.PENDING; // Reset to pending after update
 
-        return await this.propertyRepo.save(property);
+        const updatedProperty = await this.propertyRepo.save(property);
+
+        // 4. Notify Admin of the Update
+        const admin = await this.userRepository.findOne({
+            where: { role: UserRole.ADMIN },
+            select: ['id']
+        });
+
+        if (admin) {
+            await this.notificationService.createNotification(
+                admin.id,
+                'PROPERTY_UPDATED',
+                'Property Details Updated',
+                `Changes have been made to the property: "${trimText(updatedProperty.name)}". Please re-review the details for approval.`,
+                'property',
+                updatedProperty.id
+            );
+        }
+
+        return updatedProperty;
     }
 
     async deleteFile(userId: string, propertyId: string, type: 'image' | 'document', fileUrl?: string) {
@@ -128,10 +167,21 @@ export class PropertiesService {
 
     async toggleArchive(userId: string, propertyId: string, isArchived: boolean) {
         const property = await this.propertyRepo.findOne({ where: { id: propertyId } });
-        if (!property || property.userId !== userId) throw new ForbiddenException();
 
+        // 1. Check if property exists and belongs to the user
+        if (!property) {
+            throw new NotFoundException('The requested property could not be found.');
+        }
+
+        if (property.userId !== userId) {
+            throw new ForbiddenException('You do not have permission to archive or unarchive this property.');
+        }
+
+        // 2. Set status: Unarchiving moves it back to PENDING for Admin review
         property.status = isArchived ? PropertyStatus.ARCHIVED : PropertyStatus.PENDING;
-        return await this.propertyRepo.save(property);
+        const savedProperty = await this.propertyRepo.save(property);
+
+        return savedProperty;
     }
 
     private deletePhysicalFile(filePath: string) {
@@ -148,7 +198,45 @@ export class PropertiesService {
         if (!property) throw new NotFoundException('Property not found');
 
         property.status = status;
-        return await this.propertyRepo.save(property);
+        const updatedProperty = await this.propertyRepo.save(property);
+
+        let notificationTitle = '';
+        let notificationMessage = '';
+
+        // Applying the "Trim" rule for a clean notification layout
+        const trimmedName = trimText(updatedProperty.name);
+
+        switch (status) {
+            case PropertyStatus.ACTIVE:
+                notificationTitle = 'Property Approved';
+                notificationMessage = `Your property "${trimmedName}" has been approved and is now active.`;
+                break;
+            case PropertyStatus.REJECTED:
+                notificationTitle = 'Property Rejected';
+                notificationMessage = `Your property "${trimmedName}" has been rejected after review.`;
+                break;
+            case PropertyStatus.INACTIVE:
+                notificationTitle = 'Property Deactivated';
+                notificationMessage = `Your property "${trimmedName}" is now inactive and hidden from the public.`;
+                break;
+            case PropertyStatus.ARCHIVED:
+                notificationTitle = 'Property Archived';
+                notificationMessage = `Your property listing "${trimmedName}" has been archived by the administration.`;
+                break;
+        }
+
+        if (notificationTitle) {
+            await this.notificationService.createNotification(
+                property.userId,
+                'PROPERTY_STATUS_CHANGED',
+                notificationTitle,
+                notificationMessage,
+                'property',
+                property.id
+            );
+        }
+
+        return updatedProperty;
     }
 
     /**
@@ -235,7 +323,7 @@ export class PropertiesService {
     async searchProperties(query: GuestPropertySearchDto): Promise<CustomPaginatedResponse<Property>> {
         const {
             page = 1, limit = 10, sortBy = 'created_at', sortOrder = 'DESC',
-            stateId, rentType, propertyType, subType, paymentType, isFurnished,
+            stateId, rentType, propertyType, subType, isFurnished,
             minPrice, maxPrice, minArea, maxArea, constructionDate,
             bedrooms, bathrooms, livingRooms, maidRoom
         } = query;
@@ -250,7 +338,6 @@ export class PropertiesService {
         if (rentType) queryBuilder.andWhere('p.rent_type = :rentType', { rentType });
         if (propertyType) queryBuilder.andWhere('p.property_type = :propertyType', { propertyType });
         if (subType) queryBuilder.andWhere('p.sub_type = :subType', { subType });
-        if (paymentType) queryBuilder.andWhere('p.payment_type = :paymentType', { paymentType });
         if (isFurnished !== undefined) queryBuilder.andWhere('p.is_furnished = :isFurnished', { isFurnished });
         if (constructionDate) queryBuilder.andWhere('p.construction_date >= :constructionDate', { constructionDate });
 
@@ -292,4 +379,6 @@ export class PropertiesService {
             records: publicRecords as any,
         };
     }
+
+
 }

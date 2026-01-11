@@ -74,17 +74,47 @@ export class NotificationService {
     return this.notificationRepository.save(notification);
   }
 
-  async sendBulkNotification(userIds: string[], type: string, title: string, message: string) {
+  async sendBulkNotification(userIds: string[], type: string, title: string, message: string, relatedEntityType?: string, relatedEntityId?: string) {
     const notifications = userIds.map(userId =>
       this.notificationRepository.create({
         userId,
         type,
         title,
         message,
+        relatedEntityType,
+        relatedEntityId,
         isRead: false,
       }),
     );
 
     return this.notificationRepository.save(notifications);
   }
+
+  async sendBulkNotificationWithPayload(
+    notificationsInput: IBulkNotificationPayload[],
+  ) {
+    const notifications = notificationsInput.map(input =>
+      this.notificationRepository.create({
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        message: input.message,
+        relatedEntityType: input.relatedEntityType,
+        relatedEntityId: input.relatedEntityId,
+        isRead: false,
+      }),
+    );
+
+    return this.notificationRepository.save(notifications);
+  }
+
+}
+
+export interface IBulkNotificationPayload {
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
 }

@@ -1,39 +1,41 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, MaxLength, Matches, IsDate, IsEnum, MinLength, Validate, ValidateIf, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, MaxLength, Matches, IsDate, IsEnum, MinLength, Validate, ValidateIf, ValidateNested, Length } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IdentityType } from 'src/common/entities/user.entity';
 
-export class UpdateAddressDto {
-    @ApiProperty({ example: 'b0256268-80f6-41f2-9856-78e7636e0d37', description: 'UUID of the state' })
-    @IsOptional()
-    @IsString()
-    stateId: string;
 
-    @ApiProperty({ example: 'Riyadh' })
-    @IsOptional()
-    @IsString()
-    city: string;
 
-    @ApiProperty({ example: 'King Fahd Road' })
-    @IsOptional()
-    @IsString()
-    streetName: string;
+// export class UpdateAddressDto {
+//     @ApiProperty({ example: 'b0256268-80f6-41f2-9856-78e7636e0d37', description: 'UUID of the state' })
+//     @IsOptional()
+//     @IsString()
+//     stateId: string;
 
-    @ApiProperty({ example: '1234' })
-    @IsOptional()
-    @IsString()
-    buildingNumber: string;
+//     @ApiProperty({ example: 'Riyadh' })
+//     @IsOptional()
+//     @IsString()
+//     city: string;
 
-    @ApiPropertyOptional({ example: '12211' })
-    @IsOptional()
-    @IsString()
-    postalCode?: string;
+//     @ApiProperty({ example: 'King Fahd Road' })
+//     @IsOptional()
+//     @IsString()
+//     streetName: string;
 
-    @ApiPropertyOptional({ example: '7890' })
-    @IsOptional()
-    @IsString()
-    additionalNumber?: string;
-}
+//     @ApiProperty({ example: '1234' })
+//     @IsOptional()
+//     @IsString()
+//     buildingNumber: string;
+
+//     @ApiPropertyOptional({ example: '12211' })
+//     @IsOptional()
+//     @IsString()
+//     postalCode?: string;
+
+//     @ApiPropertyOptional({ example: '7890' })
+//     @IsOptional()
+//     @IsString()
+//     additionalNumber?: string;
+// }
 
 export class UpdateUserDto {
     @ApiProperty({ example: 'Ahmad Al-Saud' })
@@ -88,11 +90,19 @@ export class UpdateUserDto {
     @IsString()
     nationalityId?: string;
 
-    @ApiPropertyOptional({ type: UpdateAddressDto })
+
+    @IsString()
     @IsOptional()
-    @ValidateNested()
-    @Type(() => UpdateAddressDto)
-    address?: UpdateAddressDto;
+    @Length(8, 8, { message: 'National Address Code must be exactly 8 characters' })
+    @Matches(/^[A-Z]{4}\d{4}$|^[0-9]{8}$/, { message: 'National Address Code must be 8 alphanumeric characters' })
+    shortAddress: string;
+
+    //We will store at database short address number instead of detailed address
+    // @ApiPropertyOptional({ type: UpdateAddressDto })
+    // @IsOptional()
+    // @ValidateNested()
+    // @Type(() => UpdateAddressDto)
+    // address?: UpdateAddressDto;
 }
 
 export class UpdateUserProfileDto extends PartialType(UpdateUserDto) { }

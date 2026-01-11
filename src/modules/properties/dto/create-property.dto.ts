@@ -10,7 +10,7 @@ import {
     IsDateString
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CommercialSubType, DocumentType, OwnershipType, PaymentType, PropertyType, RentType, ResidentialSubType } from 'src/common/entities/property.entity';
+import { CommercialSubType, DocumentType, OwnershipType, PropertyType, RentType, ResidentialSubType } from 'src/common/entities/property.entity';
 
 
 class FacilityDto {
@@ -72,7 +72,6 @@ export class CreatePropertyDto {
     @IsOptional() @IsString() @MaxLength(200) complexName?: string;
 
     @IsEnum(RentType) @IsNotEmpty() rentType: RentType;
-    @IsEnum(PaymentType) @IsNotEmpty() paymentType: PaymentType;
     @IsEnum(OwnershipType) @IsNotEmpty() ownershipType: OwnershipType;
 
     // Document Data

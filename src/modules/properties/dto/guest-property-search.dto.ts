@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsEnum, IsNumber, Min, IsArray, IsDateString, IsBoolean, ValidateIf, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { CommercialSubType, PaymentType, PropertyType, RentType, ResidentialSubType } from 'src/common/entities/property.entity';
+import { CommercialSubType, PropertyType, RentType, ResidentialSubType } from 'src/common/entities/property.entity';
 export class GuestPropertySearchDto extends PaginationDto {
 
     @IsOptional()
@@ -20,8 +20,6 @@ export class GuestPropertySearchDto extends PaginationDto {
     @ValidateIf(o => o.propertyType === PropertyType.COMMERCIAL)
     @IsEnum(CommercialSubType, { message: 'Must be a valid commercial sub-type' })
     subType: ResidentialSubType | CommercialSubType;
-
-    @IsOptional() @IsEnum(PaymentType) paymentType?: PaymentType;
 
     @IsOptional() @IsBoolean() @Type(() => Boolean) isFurnished?: boolean;
 

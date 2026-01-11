@@ -13,5 +13,6 @@ import { AppGateway } from 'src/common/websocket/app.gateway';
     TypeOrmModule.forFeature([Notification, User])],
   controllers: [NotificationController],
   providers: [NotificationService, AppGateway, NotificationSubscriber],
+  exports: [NotificationService]
 })
 export class NotificationModule { }

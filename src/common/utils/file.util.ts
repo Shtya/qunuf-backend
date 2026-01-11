@@ -53,3 +53,40 @@ export function imageUploadConfig(folder: string, size: number = 10) { // size i
         limits: { fileSize: (size || 10) * 1024 * 1024 } // 10MB
     };
 }
+
+
+// Regex to strictly allow only PDF files
+export const PDF_RE = /^application\/pdf$/;
+
+export function fileUploadConfig(folder: string, size: number = 20, type = PDF_RE) { // Default 20MB for docs
+    return {
+        storage: diskStorage({
+            destination: (_req, file, cb) => {
+                // Check if it is a PDF
+                if (!type.test(file.mimetype)) {
+                    // Extracting extension from mimetype for a clearer general message
+                    const allowedExt = file.mimetype.split('/')[1]?.toUpperCase() || 'requested';
+                    return cb(new Error(`Invalid file format. The uploaded file type is not allowed.`), '');
+                }
+
+                // Store in uploads/documents instead of uploads/images
+                const dir = join(process.cwd(), 'uploads', 'documents', folder);
+                if (!existsSync(dir)) {
+                    mkdirSync(dir, { recursive: true });
+                }
+                cb(null, dir);
+            },
+            filename: (_req, file, cb) => {
+                // Ensure filename supports UTF8 characters (important for Arabic filenames)
+                file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
+                cb(null, randName(file.originalname)); // Using your existing randName helper
+            }
+        }),
+
+        fileFilter: (_req, file, cb) => {
+            type.test(file.mimetype) ? cb(null, true) : cb(null, false);
+        },
+
+        limits: { fileSize: (size || 20) * 1024 * 1024 } // 20MB limit
+    };
+}

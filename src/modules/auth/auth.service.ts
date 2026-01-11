@@ -45,7 +45,7 @@ export class AuthService {
         const user = await this.userRepository.findOne({
             where: { email: loginDto.email },
             relations: [
-                'address',
+                // 'address',
                 'nationality',
                 'identityIssueCountry'
             ],

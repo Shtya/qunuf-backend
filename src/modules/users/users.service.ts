@@ -99,18 +99,19 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserProfileDto) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['address', 'nationality', 'identityIssueCountry']
+      relations: ['nationality', 'identityIssueCountry']
+      //'address', 
     });
 
     if (!user) throw new NotFoundException('User not found');
 
-    const [nationality, stateExists, identityCountry, saudiArabia] = await Promise.all([
+    const [nationality, identityCountry, saudiArabia] = await Promise.all([
       updateUserDto.nationalityId
         ? this.countryRepository.findOneBy({ id: updateUserDto.nationalityId })
         : null,
-      updateUserDto.address?.stateId
-        ? this.stateRepository.findOneBy({ id: updateUserDto.address.stateId })
-        : null,
+      // updateUserDto.address?.stateId
+      //   ? this.stateRepository.findOneBy({ id: updateUserDto.address.stateId })
+      //   : null,
       updateUserDto.identityIssueCountryId
         ? this.countryRepository.findOneBy({ id: updateUserDto.identityIssueCountryId })
         : null,
@@ -119,25 +120,25 @@ export class UsersService {
 
     if (updateUserDto.nationalityId && !nationality)
       throw new NotFoundException('Nationality country not found');
-    if (updateUserDto.address?.stateId && !stateExists)
-      throw new NotFoundException('Selected state not found');
+    // if (updateUserDto.address?.stateId && !stateExists)
+    //   throw new NotFoundException('Selected state not found');
     if (updateUserDto.identityIssueCountryId && !identityCountry)
       throw new NotFoundException('Identity issue country not found');
 
     if (nationality) user.nationality = nationality;
 
-    if (updateUserDto.address) {
-      user.address = user.address || ({} as Address); // tell TS it's Address type
-      user.address.userId = user.id;
+    // if (updateUserDto.address) {
+    //   user.address = user.address || ({} as Address); // tell TS it's Address type
+    //   user.address.userId = user.id;
 
-      const addr = updateUserDto.address;
-      if (addr.city !== undefined) user.address.city = addr.city.trim();
-      if (addr.stateId !== undefined) user.address.stateId = addr.stateId.trim();
-      if (addr.streetName !== undefined) user.address.streetName = addr.streetName.trim();
-      if (addr.buildingNumber !== undefined) user.address.buildingNumber = addr.buildingNumber.trim();
-      if (addr.postalCode !== undefined) user.address.postalCode = addr.postalCode?.trim();
-      if (addr.additionalNumber !== undefined) user.address.additionalNumber = addr.additionalNumber?.trim();
-    }
+    //   const addr = updateUserDto.address;
+    //   if (addr.city !== undefined) user.address.city = addr.city.trim();
+    //   if (addr.stateId !== undefined) user.address.stateId = addr.stateId.trim();
+    //   if (addr.streetName !== undefined) user.address.streetName = addr.streetName.trim();
+    //   if (addr.buildingNumber !== undefined) user.address.buildingNumber = addr.buildingNumber.trim();
+    //   if (addr.postalCode !== undefined) user.address.postalCode = addr.postalCode?.trim();
+    //   if (addr.additionalNumber !== undefined) user.address.additionalNumber = addr.additionalNumber?.trim();
+    // }
 
 
     const saudiIdentityTypes = [
@@ -164,6 +165,7 @@ export class UsersService {
     if (updateUserDto.phoneNumber !== undefined) user.phoneNumber = updateUserDto.phoneNumber.trim();
     if (updateUserDto.birthDate !== undefined) user.birthDate = updateUserDto.birthDate;
     if (updateUserDto.identityNumber !== undefined) user.identityNumber = updateUserDto.identityNumber.trim();
+    if (updateUserDto.shortAddress !== undefined) user.shortAddress = updateUserDto.shortAddress.trim();
 
     await this.userRepository.save(user);
     return await this.getUser(user.id);
@@ -195,7 +197,7 @@ export class UsersService {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: [
-        'address',
+        //'address', 
         'nationality',
         'identityIssueCountry'
       ],

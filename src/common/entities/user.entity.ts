@@ -114,7 +114,7 @@ export class User extends CoreEntity {
     @Column({ type: 'varchar', length: 255, nullable: true, name: 'identity_other_type', select: false })
     identityOtherType: string | null;
 
-    @Column({ type: 'date', nullable: true, name: 'birth_date', select: false })
+    @Column({ type: 'timestamptz', nullable: true, name: 'birth_date', select: false })
     birthDate: Date | null;
 
     @Column({ type: 'varchar', length: 20, nullable: true, name: 'phone_number', select: false })
@@ -132,12 +132,16 @@ export class User extends CoreEntity {
     @Column({ name: 'pending_email_code', type: 'varchar', nullable: true, select: false })
     pendingEmailCode: string | null;
 
-    @Column({ name: 'last_email_change_sent_at', type: 'varchar', nullable: true, select: false })
+    @Column({ name: 'last_email_change_sent_at', type: 'timestamptz', nullable: true, select: false })
     lastEmailChangeSentAt: Date | null;
 
-    @OneToOne("Address", "User", { cascade: true, nullable: true })
-    @JoinColumn({ name: 'address_id' })
-    address?: Relation<Address | null>;
+    //We will store short address number instead of detailed address
+    // @OneToOne("Address", "User", { cascade: true, nullable: true })
+    // @JoinColumn({ name: 'address_id' })
+    // address?: Relation<Address | null>;
+
+    @Column({ type: 'varchar', name: "short_address", length: 8, unique: true, nullable: true, })
+    shortAddress: string | null;
 
     @OneToMany('Session', 'User')
     sessions: Relation<Session[]>;

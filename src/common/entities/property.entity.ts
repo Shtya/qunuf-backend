@@ -42,12 +42,12 @@ export enum OwnershipType {
     REPRESENTATIVE = 'representative',
 }
 
-export enum PaymentType {
-    MONTHLY = 'monthly',
-    QUARTERLY = 'quarterly',
-    SEMI_ANNUAL = 'semi_annual',
-    ANNUAL = 'annual',
-}
+// export enum PaymentType {
+//     MONTHLY = 'monthly',
+//     QUARTERLY = 'quarterly',
+//     SEMI_ANNUAL = 'semi_annual',
+//     ANNUAL = 'annual',
+// }
 
 export enum DocumentType {
     ELECTRONIC_DEED = 'electronic_deed',
@@ -137,14 +137,11 @@ export class Property extends CoreEntity {
     @Column('decimal', { precision: 10, scale: 2, name: 'security_deposit' })
     securityDeposit: number;
 
-    @Column({ type: 'date', nullable: true, name: 'construction_date' })
+    @Column({ type: 'timestamptz', nullable: true, name: 'construction_date' })
     constructionDate: Date;
 
     @Column({ type: 'enum', enum: RentType, name: 'rent_type' })
     rentType: RentType;
-
-    @Column({ type: 'enum', enum: PaymentType, name: 'payment_type' })
-    paymentType: PaymentType;
 
     @Column({ nullable: true, name: 'insurance_policy_number' })
     insurancePolicyNumber: string;
@@ -158,7 +155,7 @@ export class Property extends CoreEntity {
     @Column({ type: 'enum', enum: DocumentType, name: 'document_type' })
     documentType: DocumentType;
 
-    @Column({ type: 'date', name: 'document_issue_date' })
+    @Column({ type: 'timestamptz', name: 'document_issue_date' })
     documentIssueDate: Date;
 
     @Column({ name: 'document_number' })
@@ -219,11 +216,9 @@ export class Property extends CoreEntity {
 
     @ManyToOne(() => User, (user) => user.id)
     @JoinColumn({ name: 'user_id' }) // تأكد من وجود الـ decorator هذا لربط الـ FK
-    userId: string | null;
+    userId: string;
 
     @Column({ type: 'uuid', name: 'state_id', nullable: true })
     stateId: string | null;
-
-
 
 }

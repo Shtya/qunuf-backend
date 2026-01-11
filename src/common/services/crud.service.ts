@@ -181,6 +181,19 @@ export class CRUD {
             query.andWhere(
                 new Brackets(qb => {
                     searchFields.forEach(field => {
+                        if (field.includes('.')) {
+                            const [columnName, jsonKey] = field.split('.');
+                            const columnMetadata = repository.metadata.columns.find(col => col.propertyName === columnName);
+
+                            if (columnMetadata?.type === 'jsonb') {
+                                // Postgres syntax: column->>'key' gets the value as text
+                                qb.orWhere(`LOWER(${entityName}.${columnName}->>'${jsonKey}') LIKE LOWER(:search)`, {
+                                    search: `%${search}%`
+                                });
+                                return; // Skip the rest of the loop for this field
+                            }
+                        }
+
                         const columnMetadata = repository.metadata.columns.find(col => col.propertyName === field);
                         if (columnMetadata?.type === 'jsonb') {
                             qb.orWhere(`LOWER(${entityName}.${field}::text) LIKE LOWER(:search)`, { search: `%${search}%` });

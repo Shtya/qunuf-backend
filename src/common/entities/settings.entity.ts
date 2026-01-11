@@ -67,4 +67,7 @@ export class Settings extends CoreEntity {
 
     @Column({ name: 'name', type: 'varchar', length: 255, nullable: true })
     name: string | null;
+
+    @Column({ type: 'text', nullable: true, name: 'default_contract_terms' })
+    defaultContractTerms: string;
 }
