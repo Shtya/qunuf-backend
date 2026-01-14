@@ -2,6 +2,7 @@ import { ensureDir, remove } from 'fs-extra';
 import { join, extname } from 'path';
 import { diskStorage } from 'multer';
 import { existsSync, mkdirSync } from 'fs';
+import { BadRequestException } from '@nestjs/common';
 
 export function ensureDirectory(dir: string) {
     return ensureDir(dir);
@@ -88,5 +89,65 @@ export function fileUploadConfig(folder: string, size: number = 20, type = PDF_R
         },
 
         limits: { fileSize: (size || 20) * 1024 * 1024 } // 20MB limit
+    };
+}
+
+
+
+export function propertyUploadConfig() {
+    // Set the limit to the LARGEST allowed size (e.g., 30MB for the PDF)
+    const MAX_SIZE_MB = 30;
+
+    return {
+        storage: diskStorage({
+            destination: (req, file, cb) => {
+                let folder = '';
+
+                // 1. LOGIC FOR IMAGES
+                if (file.fieldname === 'images') {
+                    if (!IMG_RE.test(file.mimetype)) {
+                        return cb(new BadRequestException('Field "images" must contain image files'), '');
+                    }
+                    folder = 'uploads/images/properties';
+                }
+                // 2. LOGIC FOR DOCUMENTS
+                else if (file.fieldname === 'documentImage') {
+                    if (!PDF_RE.test(file.mimetype)) {
+                        return cb(new BadRequestException('Field "documentImage" must be a PDF'), '');
+                    }
+                    folder = 'uploads/documents/properties';
+                }
+
+                file.is_primary = true;
+
+                // Create directory if it doesn't exist
+                const dir = join(process.cwd(), folder);
+                if (!existsSync(dir)) {
+                    mkdirSync(dir, { recursive: true });
+                }
+                cb(null, dir);
+            },
+            filename: (req, file, cb) => {
+                // UTF-8 support for filenames
+                file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
+                const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
+                cb(null, `${randomName}${extname(file.originalname)}`);
+            },
+        }),
+
+        fileFilter: (req, file, cb) => {
+            // Allow Images ONLY for the 'images' field
+            if (file.fieldname === 'images' && IMG_RE.test(file.mimetype)) {
+                return cb(null, true);
+            }
+            // Allow PDFs ONLY for the 'documentImage' field
+            if (file.fieldname === 'documentImage' && PDF_RE.test(file.mimetype)) {
+                return cb(null, true);
+            }
+
+            return cb(new BadRequestException(`Invalid file type for field ${file.fieldname}`), false);
+        },
+
+        limits: { fileSize: MAX_SIZE_MB * 1024 * 1024 }, // Global limit (30MB)
     };
 }

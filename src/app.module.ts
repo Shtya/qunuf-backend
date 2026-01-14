@@ -27,6 +27,7 @@ import { ContractsModule } from './modules/contracts/contracts.module';
 import { ContractAutoTerminatorService } from './common/backgroundServices/contract_auto_terminator_service';
 import { ContractsService } from './modules/contracts/contracts.service';
 import { ContractAutoRenewTerminatorService } from './common/backgroundServices/contact_auto_renew_terminator_service';
+import { SharedModule } from './modules/shared.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { ContractAutoRenewTerminatorService } from './common/backgroundServices/
       collectionName: "backend",
       runTest: false
     }),
+    SharedModule,
     SeedModule,
     UsersModule,
     AuthModule,

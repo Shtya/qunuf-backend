@@ -62,32 +62,54 @@ export class CRUD {
         return { items, nextCursor, hasMore };
     }
 
-    static async findAll<T extends ObjectLiteral>(repository: Repository<T>,
+    private static flatten(obj: any, prefix = ''): Record<string, any> {
+        let result: Record<string, any> = {};
+
+        Object.entries(obj).forEach(([key, value]) => {
+            const prefixedKey = prefix ? `${prefix}.${key}` : key;
+
+            if (typeof value === 'object' &&
+                value !== null &&
+                !Array.isArray(value)
+            ) {
+                // Detect operator objects (contain keys like not, isNull, in, like)
+                const operatorKeys = ['not', 'isNull', 'in', 'like'];
+                const isOperatorObject = Object.keys(value).some(k =>
+                    operatorKeys.includes(k)
+                );
+
+                if (isOperatorObject) {
+                    // Preserve operator object as-is
+                    result[prefixedKey] = value;
+                } else {
+                    // Normal nested object → keep flattening
+                    Object.assign(result, this.flatten(value, prefixedKey));
+                }
+            } else {
+                result[prefixedKey] = value;
+            }
+        });
+
+        return result;
+    }
+
+    private static buildBaseQuery<T extends ObjectLiteral>(
+        repository: Repository<T>,
         entityName: string,
         search?: string,
-        page: any = 1,
-        limit: any = 10,
         sortBy?: string,
         sortOrder: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC',
         relations?: string[],
         searchFields?: string[],
         filters?: Record<string, any>,
         extraSelects?: string[],
-    ): Promise<CustomPaginatedResponse<T>> {
-        const pageNumber = Number(page) || 1;
-        const limitNumber = Number(limit) || 10;
-
-        if (isNaN(pageNumber) || isNaN(limitNumber) || pageNumber < 1 || limitNumber < 1) {
-            throw new BadRequestException('Pagination parameters must be valid numbers greater than 0.');
-        }
+    ): SelectQueryBuilder<T> {
 
         if (!['ASC', 'DESC', 'asc', 'desc'].includes(sortOrder)) {
             throw new BadRequestException("Sort order must be either 'ASC' or 'DESC'.");
         }
 
-        const skip = (pageNumber - 1) * limitNumber;
-        const query = repository.createQueryBuilder(entityName).skip(skip).take(limitNumber);
-
+        const query = repository.createQueryBuilder(entityName);
 
         if (extraSelects?.length) {
             extraSelects.forEach(col => {
@@ -95,40 +117,8 @@ export class CRUD {
             });
         }
 
-        function flatten(obj: any, prefix = ''): Record<string, any> {
-            let result: Record<string, any> = {};
-
-            Object.entries(obj).forEach(([key, value]) => {
-                const prefixedKey = prefix ? `${prefix}.${key}` : key;
-
-                if (typeof value === 'object' &&
-                    value !== null &&
-                    !Array.isArray(value)
-                ) {
-                    // Detect operator objects (contain keys like not, isNull, in, like)
-                    const operatorKeys = ['not', 'isNull', 'in', 'like'];
-                    const isOperatorObject = Object.keys(value).some(k =>
-                        operatorKeys.includes(k)
-                    );
-
-                    if (isOperatorObject) {
-                        // Preserve operator object as-is
-                        result[prefixedKey] = value;
-                    } else {
-                        // Normal nested object → keep flattening
-                        Object.assign(result, flatten(value, prefixedKey));
-                    }
-                } else {
-                    result[prefixedKey] = value;
-                }
-            });
-
-            return result;
-        }
-
-
         if (filters && Object.keys(filters).length > 0) {
-            const flatFilters = flatten(filters);
+            const flatFilters = this.flatten(filters);
             Object.entries(flatFilters).forEach(([flatKey, value]) => {
                 if (value !== null && value !== undefined && value !== '') {
                     const paramKey = flatKey.replace(/\./g, '_');
@@ -243,8 +233,39 @@ export class CRUD {
             throw new BadRequestException(`Invalid sortBy field: '${sortField}'`);
         }
 
+
         query.orderBy(`${entityName}.${sortField}`, sortDirection);
 
+
+        return query;
+    }
+    static async findAll<T extends ObjectLiteral>(
+        repository: Repository<T>,
+        entityName: string,
+        search?: string,
+        page: any = 1,
+        limit: any = 10,
+        sortBy?: string,
+        sortOrder: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC',
+        relations?: string[],
+        searchFields?: string[],
+        filters?: Record<string, any>,
+        extraSelects?: string[],
+    ): Promise<CustomPaginatedResponse<T>> {
+
+        const pageNumber = Number(page) || 1;
+        const limitNumber = Number(limit) || 10;
+
+        if (isNaN(pageNumber) || isNaN(limitNumber) || pageNumber < 1 || limitNumber < 1) {
+            throw new BadRequestException('Pagination parameters must be valid numbers greater than 0.');
+        }
+        // const skip = (pageNumber - 1) * limitNumber;
+        // const query = repository.createQueryBuilder(entityName).skip(skip).take(limitNumber);
+        const query = CRUD.buildBaseQuery(
+            repository, entityName, search, sortBy, sortOrder, relations, searchFields, filters, extraSelects
+        );
+        const skip = (pageNumber - 1) * limitNumber;
+        query.skip(skip).take(limitNumber);
 
         const [data, total] = await query.getManyAndCount();
 
@@ -256,5 +277,46 @@ export class CRUD {
         };
 
         return { records: data, pagination }
+    }
+
+    static async findAllLimited<T extends ObjectLiteral>(
+        repository: Repository<T>,
+        entityName: string,
+        limit: number = 10, // Required, e.g. 1000
+        search?: string,
+        sortBy?: string,
+        sortOrder: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC',
+        relations?: string[],
+        searchFields?: string[],
+        filters?: Record<string, any>,
+        extraSelects?: string[],
+    ): Promise<CustomPaginatedResponse<T>> {
+
+        const limitNumber = Number(limit);
+        if (limitNumber < 1) {
+            throw new BadRequestException('Limit must be greater than 0.');
+        }
+
+        // 1. Get Base Query
+        const query = CRUD.buildBaseQuery(
+            repository, entityName, search, sortBy, sortOrder, relations, searchFields, filters, extraSelects
+        );
+
+        // 2. Apply Limit Only (No Skip)
+        query.take(limitNumber);
+
+        // 3. Execute
+        // We still use getManyAndCount to provide consistent response structure
+        const [data, total] = await query.getManyAndCount();
+
+        return {
+            records: data,
+            pagination: {
+                page: 1, // Always page 1 because it's a flat list
+                limit: limitNumber,
+                total,
+                totalPages: 1, // Always 1 "page" of data
+            }
+        };
     }
 }

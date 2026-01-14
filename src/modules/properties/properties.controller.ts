@@ -1,18 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { UserRole } from 'src/common/entities/user.entity';
-import { ApiOperation } from '@nestjs/swagger';
-import { create } from 'domain';
+import { ApiConsumes, ApiOperation } from '@nestjs/swagger';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { User } from 'src/common/decorators/user.decorator';
-import { imageUploadConfig } from 'src/common/utils/file.util';
+import { imageUploadConfig, propertyUploadConfig } from 'src/common/utils/file.util';
 import { PropertyFileValidationPipe } from 'src/common/pipes/property-file-validation.pipe';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PropertyStatus } from 'src/common/entities/property.entity';
-import { PropertyFilterDto } from './dto/property-filter.dto';
+import { PropertyExportFilterDto, PropertyFilterDto } from './dto/property-filter.dto';
 import { GuestPropertySearchDto } from './dto/guest-property-search.dto';
+import { Response } from 'express';
 
 @Controller('properties')
 export class PropertiesController {
@@ -25,18 +25,20 @@ export class PropertiesController {
   @UseInterceptors(FileFieldsInterceptor([
     { name: 'images', maxCount: 6 },
     { name: 'documentImage', maxCount: 1 }
-  ], imageUploadConfig('properties', 30)))
+  ], propertyUploadConfig()))
   @ApiOperation({ summary: 'Landlord: Create new property (Sets to Pending)' })
+  @ApiConsumes('multipart/form-data')
   async create(
     @User() user: any,
     @UploadedFiles(PropertyFileValidationPipe) files: { images?: any[], documentImage?: any[] },
     @Body() dto: CreatePropertyDto
   ) {
     const imagePaths = files.images?.map(f => `uploads/images/properties/${f.filename}`) || [];
-    const docPath = files.documentImage?.[0] ? `uploads/images/properties/${files.documentImage[0].filename}` : '';
+    const docPath = files.documentImage?.[0] ? `uploads/images/properties/${files.documentImage[0].filename}` : null;
 
+    const doc = docPath ? { path: docPath, filename: files.documentImage?.[0].originalname } : null;
     // Logic inside service sets status to PENDING and links userId
-    return this.propertiesService.create(user.id, dto, imagePaths, docPath);
+    return this.propertiesService.create(user.id, dto, imagePaths, doc);
   }
 
   @Put(':id')
@@ -44,7 +46,7 @@ export class PropertiesController {
   @UseInterceptors(FileFieldsInterceptor([
     { name: 'images', maxCount: 6 },
     { name: 'documentImage', maxCount: 1 }
-  ], imageUploadConfig('properties', 30)))
+  ], propertyUploadConfig()))
   async update(
     @User() user: any,
     @Param('id') id: string,
@@ -52,9 +54,10 @@ export class PropertiesController {
     @Body() dto: UpdatePropertyDto
   ) {
     const imagePaths = files.images?.map(f => `uploads/images/properties/${f.filename}`) || [];
-    const docPath = files.documentImage?.[0] ? `uploads/images/properties/${files.documentImage[0].filename}` : undefined;
+    const docPath = files.documentImage?.[0] ? `uploads/images/properties/${files.documentImage[0].filename}` : null;
 
-    return this.propertiesService.update(user.id, id, dto, imagePaths, docPath);
+    const doc = docPath ? { path: docPath, filename: files.documentImage?.[0].originalname } : null;
+    return this.propertiesService.update(user.id, id, dto, imagePaths, doc);
   }
 
   @Delete(':id/files')
@@ -70,8 +73,8 @@ export class PropertiesController {
 
   @Patch(':id/archive')
   @Auth(UserRole.LANDLORD)
-  async setArchive(@User() user: any, @Param('id') id: string, @Body('archive') archive: boolean) {
-    return this.propertiesService.toggleArchive(user.id, id, archive);
+  async setArchive(@User() user: any, @Param('id') id: string) {
+    return this.propertiesService.toggleArchive(user.id, id);
   }
 
   @Patch(':id/status')
@@ -92,6 +95,7 @@ export class PropertiesController {
     return this.propertiesService.findOneForGuest(id);
   }
 
+
   // --- PRIVATE (ADMIN & OWNER) ---
   @Get(':id/full-details')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -100,7 +104,7 @@ export class PropertiesController {
     @User() user: any,
     @Param('id') id: string
   ) {
-    return this.propertiesService.findOneFull(id, user.id);
+    return this.propertiesService.findOneFull(id, user);
   }
 
   @Get('all')
@@ -111,6 +115,21 @@ export class PropertiesController {
     @Query() query: PropertyFilterDto,
   ) {
     return this.propertiesService.findAll(user, query);
+  }
+
+  @Get('export')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  async export(
+    @User() user: any,
+    @Query() query: PropertyExportFilterDto, // This includes search, status, type, etc.
+    @Res() res: Response
+  ) {
+    const buffer = await this.propertiesService.exportProperties(user, query);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=properties_export_${Date.now()}.xlsx`);
+
+    return res.send(buffer);
   }
 
   @Get('search')

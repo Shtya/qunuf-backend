@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { Contract, ContractStatus, PaymentInstallment, PropertySnapshot, UserSnapshot } from 'src/common/entities/contract.entity';
 import { Property, PropertyType, RentType } from 'src/common/entities/property.entity';
@@ -16,6 +16,7 @@ import { ContractFilterDto } from './dto/contract-filter.dto';
 import { CRUD } from 'src/common/services/crud.service';
 import { RenewRequest, RenewStatus } from 'src/common/entities/renew_request';
 import { RenewFilterDto } from './dto/renew_filter.dto';
+import { ContractDataMasker } from 'src/common/utils/contractDataMasker';
 
 @Injectable()
 export class ContractsService {
@@ -31,6 +32,7 @@ export class ContractsService {
     @InjectRepository(RenewRequest)
     private renewRepo: Repository<RenewRequest>,
     private notificationService: NotificationService,
+    private dataSource: DataSource,
   ) { }
 
   private readonly RENT_MONTH_DAYS = 30
@@ -197,7 +199,7 @@ export class ContractsService {
 
     await this.notificationService.sendBulkNotificationWithPayload(notifications);
 
-    return savedContract;
+    return ContractDataMasker.mask(savedContract, tenant.role);
   }
 
   private validateTenantProfile(user: User) {
@@ -239,13 +241,19 @@ export class ContractsService {
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-    // Extract extension from original file (e.g., .jpg, .pdf)
-    const fileExt = path.extname(prop.documentImagePath);
-    const fileName = `contract_${Date.now()}_prop_doc${fileExt}`;
-    const permanentPath = path.join(uploadDir, fileName);
+
+    // Extract extension from original filename
+    const fileExt = prop.documentImage
+      ? path.extname(prop.documentImage.filename)
+      : '';
+
+    const archivedFilename = `contract_${Date.now()}_prop_doc${fileExt}`;
+    const permanentPath = path.join(uploadDir, archivedFilename);
 
     try {
-      fs.copyFileSync(prop.documentImagePath, permanentPath);
+      if (prop.documentImage?.path) {
+        fs.copyFileSync(prop.documentImage.path, permanentPath);
+      }
     } catch (error) {
       console.error('Failed to copy property document:', error);
       throw new BadRequestException('Could not archive property ownership document');
@@ -277,7 +285,7 @@ export class ContractsService {
         date: prop.documentIssueDate,
         issuedBy: prop.issuedBy,
         ownerIdNumber: prop.ownerIdNumber,
-        imagePath: permanentPath
+        documentImage: { filename: prop.documentImage?.filename || '', path: permanentPath }
       }
     };
   }
@@ -501,7 +509,16 @@ export class ContractsService {
     contract.contractNumber = contractNumber;
     contract.contractDate = new Date();
 
-    const savedContract = await this.contractRepo.save(contract);
+    const savedContract = await this.dataSource.transaction(async (transactionalEntityManager) => {
+
+      const updatedContract = await transactionalEntityManager.save(contract);
+
+      await transactionalEntityManager.update(Property, contract.propertyId, {
+        isRented: true
+      });
+
+      return updatedContract;
+    });
 
 
     const propertyName = contract.propertySnapshot?.name || 'Property';
@@ -558,8 +575,14 @@ export class ContractsService {
       if (contract.tenantId !== userId) throw new ForbiddenException('Not your contract');
 
       contract.status = ContractStatus.TERMINATED;
-      contract.terminationEffectiveDate = now; // Terminates now
-      await this.contractRepo.save(contract);
+      contract.terminationEffectiveDate = now;
+      await this.dataSource.transaction(async (transactionalEntityManager) => {
+        await transactionalEntityManager.save(contract);
+
+        await transactionalEntityManager.update(Property, contract.propertyId, {
+          isRented: false
+        });
+      });
 
       // تجهيز قائمة الإشعارات
       const notifications = [
@@ -656,7 +679,7 @@ export class ContractsService {
       await this.notificationService.sendBulkNotificationWithPayload(notifications);
     }
 
-    return contract;
+    return ContractDataMasker.mask(contract, user.role);
   }
 
   // 
@@ -679,7 +702,13 @@ export class ContractsService {
     if (!contract) return;
 
     contract.status = ContractStatus.TERMINATED;
-    await this.contractRepo.save(contract);
+    await this.dataSource.transaction(async (transactionalEntityManager) => {
+      await transactionalEntityManager.save(contract);
+
+      await transactionalEntityManager.update(Property, contract.propertyId, {
+        isRented: false
+      });
+    });
 
     const trimmedName = trimText(contract.propertySnapshot?.name || 'Property');
 
@@ -738,7 +767,6 @@ export class ContractsService {
     contract.status = ContractStatus.TERMINATED;
     contract.terminationInitiatedAt = new Date();
     contract.terminationEffectiveDate = new Date();
-    await this.contractRepo.save(contract);
 
     const trimmedName = trimText(contract.propertySnapshot?.name || 'Property');
     const notifications: IBulkNotificationPayload[] = [];
@@ -747,26 +775,45 @@ export class ContractsService {
     const totalDaysSpent = differenceInDays(contract.terminationEffectiveDate, contract.startDate);
     const actualMonthsSpent = totalDaysSpent / this.RENT_MONTH_DAYS;
 
+
     const isEligibleForRenew =
       contract.shouldSendRenewalNotify &&
       (actualMonthsSpent >= incentiveMonths);
 
-    if (isEligibleForRenew) {
-      // التحقق من عدم وجود طلب سابق
-      const existingRenew = await this.renewRepo.findOne({
-        where: { originalContractId: contract.id }
+
+
+    const savedRenew = await this.dataSource.transaction(async (transactionalEntityManager) => {
+
+      await transactionalEntityManager.save(contract);
+
+      await transactionalEntityManager.update(Property, contract.propertyId, {
+        isRented: false
       });
 
-      if (!existingRenew) {
-        // إنشاء طلب تجديد جديد
-        const renewRequest = this.renewRepo.create({
-          originalContractId: contract.id,
-          tenantId: contract.tenantId,
-          offeredDiscountAmount: contract.renewalDiscountAmount || 0,
-          status: RenewStatus.PENDING
+      if (isEligibleForRenew) {
+        const existingRenew = await transactionalEntityManager.findOne(RenewRequest, {
+          where: { originalContractId: contract.id }
         });
-        await this.renewRepo.save(renewRequest);
 
+        if (!existingRenew) {
+          const renewRequest = transactionalEntityManager.create(RenewRequest, {
+            originalContractId: contract.id,
+            tenantId: contract.tenantId,
+            offeredDiscountAmount: contract.renewalDiscountAmount || 0,
+            status: RenewStatus.PENDING
+          });
+          const savedRenew = await transactionalEntityManager.save(renewRequest);
+
+          // حفظ ID التجديد لاستخدامه في الإشعارات خارج الـ Transaction
+          return savedRenew;
+        }
+      }
+
+    });
+
+
+    if (isEligibleForRenew) {
+      if (savedRenew) {
         // إشعار خاص للمستأجر بالعرض
         notifications.push({
           userId: contract.tenantId,
@@ -774,7 +821,7 @@ export class ContractsService {
           title: '🎉 Renew Offer Available!',
           message: `Your contract No: ${contract.contractNumber} regarding property "${trimmedName} ended. Renew now & save ${contract.renewalDiscountAmount} SAR!`,
           relatedEntityType: 'renew_request',
-          relatedEntityId: renewRequest.id
+          relatedEntityId: savedRenew.id
         });
 
         // إشعار للمالك بأنه تم إرسال العرض
@@ -831,8 +878,7 @@ export class ContractsService {
     if (contract.propertySnapshot) {
       contract.propertySnapshot.name = trimText(contract.propertySnapshot.name);
     }
-
-    return contract;
+    return ContractDataMasker.mask(contract, currentUser.role);
   }
 
   async findAll(user: any, query: ContractFilterDto) {
@@ -866,8 +912,8 @@ export class ContractsService {
       filters,
       []
     );
-
-    return result;
+    const records = ContractDataMasker.mask(result.records, user.role);
+    return { ...result, records };
   }
 
   async acceptRenewOffer(renewRequestId: string, tenantId: string) {
@@ -985,13 +1031,18 @@ export class ContractsService {
       requiredMonthsForIncentive: 0
     });
 
-    // 7. Transactional Save
-    const savedContract = await this.contractRepo.save(newContract);
+    const savedContract = await this.dataSource.transaction(async (transactionalEntityManager) => {
+      const contract = await transactionalEntityManager.save(newContract);
 
-    // 8. Update Renew Request Status
-    renewRequest.status = RenewStatus.ACCEPTED;
-    await this.renewRepo.save(renewRequest);
+      renewRequest.status = RenewStatus.ACCEPTED;
+      await transactionalEntityManager.save(renewRequest);
 
+      await transactionalEntityManager.update(Property, oldContract.propertyId, {
+        isRented: true
+      });
+
+      return ContractDataMasker.mask(contract, tenant.role);
+    });
     // 9. Notifications
     const trimmedName = trimText(property.name || 'Property');
 
@@ -1030,7 +1081,7 @@ export class ContractsService {
     return savedContract;
   }
 
-  // modules/contracts/contracts.service.ts
+
 
   async rejectRenewOffer(renewRequestId: string, tenantId: string) {
     // 1. البحث عن طلب التجديد مع العقد الأصلي
@@ -1131,8 +1182,6 @@ export class ContractsService {
     return expiredRequests.length;
   }
 
-  // modules/contracts/contracts.service.ts
-
   async findAllRenewRequests(user: any, query: RenewFilterDto) {
     const filters: Record<string, any> = {};
 
@@ -1156,6 +1205,8 @@ export class ContractsService {
       []
     );
 
-    return result;
+
+    const records = ContractDataMasker.maskRenew(result.records, user.role);
+    return { ...result, records };
   }
 }

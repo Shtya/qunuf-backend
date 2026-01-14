@@ -1,7 +1,8 @@
 import { IsOptional, IsString, IsEnum, IsNumber, Min, IsIn, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PropertyStatus, PropertyType } from 'src/common/entities/property.entity';
+import { OmitType } from '@nestjs/swagger';
 
 
 export class PropertyFilterDto extends PaginationDto {
@@ -10,25 +11,25 @@ export class PropertyFilterDto extends PaginationDto {
     search?: string;
 
     @IsOptional()
-    @IsEnum(PropertyStatus)
     status?: PropertyStatus | 'all' = 'all';
 
     @IsOptional()
-    @IsEnum(PropertyType)
-    propertyType?: PropertyType;
+    propertyType?: PropertyType | 'all' = 'all';
 
     @IsOptional()
     @IsBoolean()
-    @Type(() => Boolean)
-    isFurnished?: boolean;
-
-    @IsOptional()
-    @IsBoolean()
-    @Type(() => Boolean)
+    @Transform(({ value }) => value === 'true' || value === '1')
     isRented?: boolean;
 
     @IsOptional()
-    @IsIn(['created_at', 'rentPrice', 'area'])
-    declare sortBy?: 'created_at' | 'rentPrice' | 'area';
+    @IsIn(['created_at', 'name', 'status', "isRented", "propertyType", "rentPrice"])
+    declare sortBy?: 'created_at' | 'name' | 'status' | "isRented" | "propertyType" | "rentPrice";
 
 }
+
+
+export class PropertyExportFilterDto extends OmitType(PropertyFilterDto, ['page'] as const) { }
+
+
+
+

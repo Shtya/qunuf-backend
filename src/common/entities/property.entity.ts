@@ -91,14 +91,12 @@ export class Property extends CoreEntity {
     @Column({ type: 'jsonb', nullable: true, name: 'education_institutions' })
     educationInstitutions: {
         name: string;
-        type: string;
         distance_km: number;
     }[] | null;
 
     @Column({ type: 'jsonb', nullable: true, name: 'health_medical_facilities' })
     healthMedicalFacilities: {
         name: string;
-        type: string;
         distance_km: number;
     }[] | null;
 
@@ -167,8 +165,8 @@ export class Property extends CoreEntity {
     @Column({ name: 'issued_by' })
     issuedBy: string;
 
-    @Column({ name: 'document_image_path' })
-    documentImagePath: string;
+    @Column({ type: 'jsonb', name: 'document_image_path', nullable: true })
+    documentImage: { path: string; filename: string } | null;
 
     @Column({ name: 'national_address_code' })
     nationalAddressCode: string;
@@ -215,8 +213,12 @@ export class Property extends CoreEntity {
     features: string[];
 
     @ManyToOne(() => User, (user) => user.id)
-    @JoinColumn({ name: 'user_id' }) // تأكد من وجود الـ decorator هذا لربط الـ FK
+    @JoinColumn({ name: 'user_id' })
+    user: User;
+
+    @Column({ type: 'uuid', name: 'user_id' })
     userId: string;
+
 
     @Column({ type: 'uuid', name: 'state_id', nullable: true })
     stateId: string | null;

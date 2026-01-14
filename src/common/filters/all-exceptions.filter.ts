@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { Request, Response } from 'express';
+import * as fs from 'fs';
+
 
 @Injectable()
 @Catch()
@@ -19,7 +21,7 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
         const res = ctx.getResponse<Response>();
-        const req = ctx.getRequest<Request>();
+        const req = ctx.getRequest<any>();
 
         let errorResponse: {
             status: number;
@@ -27,6 +29,17 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
             errors?: any;
             detail?: any
         };
+
+        //delete any uploaded files when exeption thrown
+        const files = req.files as any;
+        if (files) {
+            const allFiles = [...(files.images || []), ...(files.documentImage || [])];
+            allFiles.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
 
         // Determine the type of error and handle accordingly
         switch (true) {

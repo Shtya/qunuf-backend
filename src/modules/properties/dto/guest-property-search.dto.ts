@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsEnum, IsNumber, Min, IsArray, IsDateString, IsBoolean, ValidateIf, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { CommercialSubType, PropertyType, RentType, ResidentialSubType } from 'src/common/entities/property.entity';
 export class GuestPropertySearchDto extends PaginationDto {
@@ -21,7 +21,7 @@ export class GuestPropertySearchDto extends PaginationDto {
     @IsEnum(CommercialSubType, { message: 'Must be a valid commercial sub-type' })
     subType: ResidentialSubType | CommercialSubType;
 
-    @IsOptional() @IsBoolean() @Type(() => Boolean) isFurnished?: boolean;
+    @IsOptional() @IsBoolean() @Transform(({ value }) => value === 'true' || value === '1') isFurnished?: boolean;
 
     // Ranges
     @IsOptional() @Type(() => Number) @IsNumber() @Min(0) minPrice?: number;
@@ -35,6 +35,6 @@ export class GuestPropertySearchDto extends PaginationDto {
     @IsOptional() @Type(() => Number) @IsNumber() @Min(0) bedrooms?: number;
     @IsOptional() @Type(() => Number) @IsNumber() @Min(0) bathrooms?: number;
     @IsOptional() @Type(() => Number) @IsNumber() @Min(0) livingRooms?: number;
-    @IsOptional() @IsBoolean() @Type(() => Boolean) maidRoom?: boolean;
+    @IsOptional() @IsBoolean() @Transform(({ value }) => value === 'true' || value === '1') maidRoom?: boolean;
 
 }

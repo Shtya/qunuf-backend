@@ -66,7 +66,7 @@ export interface PropertySnapshot {
         date: Date;
         issuedBy: string;
         ownerIdNumber: string;
-        imagePath: string; // "Copy of ownership file" path
+        documentImage: { path: string; filename: string; } | null;
     };
     // Note: Description and Marketing Images are EXCLUDED as requested
 }
