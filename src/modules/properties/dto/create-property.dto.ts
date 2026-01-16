@@ -7,10 +7,12 @@ import {
     IsNotEmpty,
     Length,
     Max,
-    IsDateString
+    IsDateString,
+    MaxDate
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CommercialSubType, DocumentType, OwnershipType, PropertyType, RentType, ResidentialSubType } from 'src/common/entities/property.entity';
+import { IsPastDate, IsYearRange } from 'src/common/utils/validators';
 
 
 class FacilityDto {
@@ -60,12 +62,29 @@ export class CreatePropertyDto {
         message: 'Property number can only contain letters, numbers, dashes, and slashes'
     }) propertyNumber: string;//
 
-    @IsNumber() @IsNotEmpty() @Type(() => Number) @Min(1) area: number;//
-    @IsNumber() @IsNotEmpty() @Type(() => Number) @Min(1) rentPrice: number;//
     @IsNumber() @IsNotEmpty() @Type(() => Number) @Min(0) securityDeposit: number;//
 
-    @IsOptional() @IsDateString() constructionDate?: string;
-    @IsNotEmpty() @IsDateString() documentIssueDate: string;//
+    @IsNumber()
+    @IsNotEmpty()
+    @Type(() => Number)
+    @Min(1, { message: 'Area must be at least 1 sq ft' })
+    @Max(100000, { message: 'Area must not exceed 100,000 sq ft' })
+    area: number;
+
+    @IsNumber()
+    @IsNotEmpty()
+    @Type(() => Number)
+    @Min(1, { message: 'Rent price must be at least 1' })
+    @Max(1000000, { message: 'Rent price must not exceed 1,000,000' })
+    rentPrice: number;
+
+    @IsOptional()
+    @IsDateString({}, { message: 'Construction date must be a valid date string (YYYY-MM-DD)' })
+    @IsYearRange(1900, new Date().getFullYear(), { message: `Construction year must be between 1900 and ${new Date().getFullYear()}`, })
+    constructionDate?: string;
+
+
+    @IsNotEmpty() @IsDateString() @IsPastDate() documentIssueDate: string;
 
     @IsOptional() @IsString() @MaxLength(100) insurancePolicyNumber?: string;
     @IsOptional() @IsString() @MaxLength(200) complexName?: string;

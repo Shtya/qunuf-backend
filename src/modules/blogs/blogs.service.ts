@@ -7,6 +7,7 @@ import { UpdateBlogDto } from "./dto/update-blog.dto";
 import { deleteFile } from "src/common/utils/file.util";
 import { CRUD } from "src/common/services/crud.service";
 import { PaginationDto } from "src/common/dto/pagination.dto";
+import { generateSlugHelper } from "src/common/utils/helpers";
 
 
 @Injectable()
@@ -17,19 +18,6 @@ export class BlogsService {
     ) { }
 
     // blogs.service.ts
-
-    private generateSlugHelper(title: string): string {
-        // 1. Create the base slug using your logic
-        const baseSlug = title
-            .toLowerCase()
-            .trim()
-            .replace(/[^\p{L}\p{N}\s-]/gu, '') // Unicode support
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-+|-+$/g, '');
-
-        return baseSlug;
-    }
 
     async findAllCursor(cursor?: { createdAt: Date; id: string }, limit: number = 20) {
         const queryBuilder = this.blogRepo.createQueryBuilder('blog').select([
@@ -63,7 +51,7 @@ export class BlogsService {
 
 
     async create(dto: CreateBlogDto, imagePath: string): Promise<Blog> {
-        const slug = this.generateSlugHelper(dto.title_en);
+        const slug = generateSlugHelper(dto.title_en);
 
         const existing = await this.blogRepo.findOne({ where: { slug } });
         if (existing) {
@@ -108,7 +96,7 @@ export class BlogsService {
         // 2. Handle slug logic if title is being updated
         let newSlug = blog.slug;
         if (dto.title_en && dto.title_en !== blog.title_en) {
-            newSlug = this.generateSlugHelper(dto.title_en); // Your regex helper
+            newSlug = generateSlugHelper(dto.title_en); // Your regex helper
 
             // Check if this slug is already taken by ANOTHER blog
             const slugExists = await this.blogRepo.findOne({

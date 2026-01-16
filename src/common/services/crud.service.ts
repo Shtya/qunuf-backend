@@ -99,7 +99,7 @@ export class CRUD {
         search?: string,
         sortBy?: string,
         sortOrder: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC',
-        relations?: string[],
+        relations?: (string | { name: string; select: string[] })[],
         searchFields?: string[],
         filters?: Record<string, any>,
         extraSelects?: string[],
@@ -172,19 +172,22 @@ export class CRUD {
                 new Brackets(qb => {
                     searchFields.forEach(field => {
                         if (field.includes('.')) {
-                            const [columnName, jsonKey] = field.split('.');
-                            const columnMetadata = repository.metadata.columns.find(col => col.propertyName === columnName);
+                            const [propName, jsonKey] = field.split('.');
+                            const columnMetadata = repository.metadata.columns.find(col => col.propertyName === propName);
 
                             if (columnMetadata?.type === 'jsonb') {
-                                // Postgres syntax: column->>'key' gets the value as text
-                                qb.orWhere(`LOWER(${entityName}.${columnName}->>'${jsonKey}') LIKE LOWER(:search)`, {
+                                // Use databaseName (e.g. landlord_snapshot) and wrap in quotes for safety
+                                const dbCol = columnMetadata.databaseName;
+                                qb.orWhere(`LOWER(${entityName}."${dbCol}"->>'${jsonKey}') LIKE LOWER(:search)`, {
                                     search: `%${search}%`
                                 });
-                                return; // Skip the rest of the loop for this field
+                                return;
                             }
                         }
 
                         const columnMetadata = repository.metadata.columns.find(col => col.propertyName === field);
+                        if (!columnMetadata) return;
+
                         if (columnMetadata?.type === 'jsonb') {
                             qb.orWhere(`LOWER(${entityName}.${field}::text) LIKE LOWER(:search)`, { search: `%${search}%` });
                         } else if (columnMetadata?.type === String || columnMetadata?.type == 'text') {
@@ -215,12 +218,25 @@ export class CRUD {
         }
 
         if (relations?.length && relations?.length > 0) {
-            const invalidRelations = relations.filter(relation => !repository.metadata.relations.some(rel => rel.propertyName === relation));
+            const relationNames = relations.map(r => (typeof r === 'string' ? r : r.name));
+            const invalidRelations = relationNames.filter(
+                name => !repository.metadata.relations.some(rel => rel.propertyName === name)
+            );
             if (invalidRelations.length > 0) {
                 throw new BadRequestException(`Invalid relations: ${invalidRelations.join(', ')}`);
             }
-            relations.forEach(relation => {
-                query.leftJoinAndSelect(`${entityName}.${relation}`, relation);
+            relations.forEach(rel => {
+                if (typeof rel === 'string') {
+                    // Standard behavior: join and select everything
+                    query.leftJoinAndSelect(`${entityName}.${rel}`, rel);
+                } else {
+                    // Advanced behavior: join and select ONLY specific columns
+                    query.leftJoin(`${entityName}.${rel.name}`, rel.name);
+
+                    rel.select.forEach(column => {
+                        query.addSelect(`${rel.name}.${column}`);
+                    });
+                }
             });
         }
 
@@ -228,13 +244,20 @@ export class CRUD {
         const sortField = sortBy || defaultSortBy;
         const sortDirection: 'ASC' | 'DESC' = (sortOrder?.toUpperCase() as 'ASC' | 'DESC') || 'DESC';
 
-        const columnExists = repository.metadata.columns.some(col => col.propertyName === sortField);
-        if (!columnExists) {
-            throw new BadRequestException(`Invalid sortBy field: '${sortField}'`);
+        const isPath = sortField.includes('.');
+
+        if (!isPath) {
+            // Only validate against metadata if it's a direct column of the entity
+            const columnExists = repository.metadata.columns.some(col => col.propertyName === sortField);
+            if (!columnExists) {
+                throw new BadRequestException(`Invalid sortBy field: '${sortField}'`);
+            }
         }
 
+        // NEW: If it's a path, don't add the entityName prefix because the path already has an alias
+        const finalSortField = isPath ? sortField : `${entityName}.${sortField}`;
 
-        query.orderBy(`${entityName}.${sortField}`, sortDirection);
+        query.orderBy(finalSortField, sortDirection);
 
 
         return query;
@@ -247,7 +270,7 @@ export class CRUD {
         limit: any = 10,
         sortBy?: string,
         sortOrder: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC',
-        relations?: string[],
+        relations?: (string | { name: string; select: string[] })[],
         searchFields?: string[],
         filters?: Record<string, any>,
         extraSelects?: string[],
@@ -286,7 +309,7 @@ export class CRUD {
         search?: string,
         sortBy?: string,
         sortOrder: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC',
-        relations?: string[],
+        relations?: (string | { name: string; select: string[] })[],
         searchFields?: string[],
         filters?: Record<string, any>,
         extraSelects?: string[],

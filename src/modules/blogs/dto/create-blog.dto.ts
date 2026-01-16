@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateBlogDto {
     @ApiProperty({ maxLength: 255, example: 'My First Blog' })
@@ -27,4 +27,9 @@ export class CreateBlogDto {
     @ApiProperty({ type: 'string', format: 'binary' })
     @IsOptional()
     image: any;
+}
+
+export class SubscribeDto {
+    @IsEmail()
+    email: string;
 }

@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiConsumes, ApiBody, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
-import { CreateBlogDto } from "./dto/create-blog.dto";
+import { CreateBlogDto, SubscribeDto } from "./dto/create-blog.dto";
 import { imageUploadConfig } from "src/common/utils/file.util";
 import { UpdateBlogDto } from "./dto/update-blog.dto";
 import { Auth } from "src/common/decorators/auth.decorator";
@@ -25,11 +25,16 @@ import { decodeCursor, encodeCursor } from "src/common/utils/crud.util";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "src/common/decorators/user.decorator";
 import { CRUD } from "src/common/services/crud.service";
+import { NewsletterService } from "./newsletter.service";
 
 @ApiTags('Blogs')
 @Controller('blogs')
 export class BlogsController {
-    constructor(private readonly blogsService: BlogsService) { }
+    constructor(
+        private readonly blogsService: BlogsService,
+        private readonly newsletterService: NewsletterService
+
+    ) { }
 
 
     @Get()
@@ -136,5 +141,10 @@ export class BlogsController {
     @ApiResponse({ status: 404, description: 'Blog not found' })
     async remove(@Param('id') id: string) {
         return this.blogsService.remove(id);
+    }
+
+    @Post('subscribe')
+    async subscribe(@Body() body: SubscribeDto) {
+        return this.newsletterService.subscribe(body.email);
     }
 }

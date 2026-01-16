@@ -9,6 +9,10 @@ import { Country } from 'src/common/entities/country.entity';
 import { State } from 'src/common/entities/state.entity';
 import { Address } from 'src/common/entities/address.entity';
 import { deleteFile } from 'src/common/utils/file.util';
+import { UserFilterDto } from './dto/user-filter.dto';
+import { CRUD, CustomPaginatedResponse } from 'src/common/services/crud.service';
+import { ExportService } from 'src/common/services/exportService';
+import { UserDataMasker } from 'src/common/utils/UserDataMasker';
 
 
 @Injectable()
@@ -22,12 +26,14 @@ export class UsersService {
 
     @InjectRepository(State)
     private stateRepository: Repository<State>,
+
+    private readonly exportService: ExportService,
   ) { }
 
 
   public maskSensitiveUserInfo(user: Partial<User>) {
     // if (user.identityNumber) {
-    //     user.identityNumber = user.identityNumber.replace(/^(.{2}).*(.{2})$/, '$1******$2');
+    //   user.identityNumber = user.identityNumber.replace(/^(.{2}).*(.{2})$/, '$1******$2');
     // }
     const { passwordHash, ...userWithoutPassword } = user;
     return userWithoutPassword;
@@ -83,11 +89,6 @@ export class UsersService {
 
     const saved = await this.userRepository.save(user);
     return saved;
-  }
-
-  async findAll() {
-    const users = await this.userRepository.find();
-    return users;
   }
 
   async findOne(id: string) {
@@ -188,6 +189,10 @@ export class UsersService {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 
+    if (user.role === UserRole.ADMIN) {
+      throw new BadRequestException('Action denied: Administrative accounts cannot be deleted.');
+    }
+
     await this.userRepository.delete(id);
     return null;
   }
@@ -213,13 +218,15 @@ export class UsersService {
         lastLogin: true,
 
         // Explicitly select "select: false" fields
-        passwordHash: true,
+        nationalityId: true,
         phoneNumber: true,
         birthDate: true,
         identityType: true,
         identityOtherType: true,
         identityNumber: true,
+        identityIssueCountryId: true,
         notificationsEnabled: true,
+        shortAddress: true,
         created_at: true,
         updated_at: true,
         deleted_at: true
@@ -229,5 +236,160 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
 
     return this.maskSensitiveUserInfo(user);
+  }
+
+  // Admin: Get all users with pagination and filters
+  async findAll(user: any, query: UserFilterDto): Promise<CustomPaginatedResponse<User>> {
+    const filters: Record<string, any> = {};
+
+    // Apply Status Filter
+    if (query.status && query.status !== 'all') {
+      filters.status = query.status;
+    }
+
+    // Apply Role Filter
+    if (query.role && query.role !== 'all') {
+      filters.role = query.role;
+    }
+
+    // Call CRUD utility
+    return CRUD.findAll<User>(
+      this.userRepository,
+      'user',
+      query.search,
+      query.page,
+      query.limit,
+      query.sortBy,
+      query.sortOrder,
+      ['nationality', 'identityIssueCountry'], // relations
+      ['name', 'email'], // search fields
+      filters,
+      ['identityType', 'notificationsEnabled', 'identityNumber', 'identityOtherType', 'birthDate', 'phoneNumber'] // extra selects
+    );
+  }
+
+  // Admin: Get full user details
+  async findOneFull(id: string) {
+    const queryBuilder = this.userRepository.createQueryBuilder('user')
+
+      .addSelect([
+        'user.id',
+        'user.identityType',
+        'user.notificationsEnabled',
+        'user.identityNumber',
+        'user.identityOtherType',
+        'user.birthDate',
+        'user.phoneNumber'
+      ])
+
+      .leftJoinAndSelect('user.nationality', 'nationality')
+
+      .leftJoinAndSelect('user.identityIssueCountry', 'identityCountry')
+      .where('user.id = :id', { id })
+      .andWhere('user.deleted_at IS NULL');
+
+    const user = await queryBuilder.getOne();
+
+    if (!user) throw new NotFoundException('User not found');
+
+    return UserDataMasker.mask(user, UserRole.ADMIN);
+  }
+
+  // Admin: Update user status
+  async updateStatus(id: string, status: UserStatus) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.role === UserRole.ADMIN) {
+      throw new BadRequestException('Action denied: Administrative accounts cannot be deactivated or have their status modified.');
+    }
+
+    user.status = status;
+    return await this.userRepository.save(user);
+  }
+
+  // Admin: Export users to Excel
+  async exportUsers(user: any, query: UserFilterDto) {
+    const filters: Record<string, any> = {};
+
+    // Apply Status Filter
+    if (query.status && query.status !== 'all') {
+      filters.status = query.status;
+    }
+
+    // Apply Role Filter
+    if (query.role && query.role !== 'all') {
+      filters.role = query.role;
+    }
+
+    // Get users with limit
+    const { records: users } = await CRUD.findAllLimited<User>(
+      this.userRepository,
+      'user',
+      query.limit,
+      query.search,
+      query.sortBy,
+      query.sortOrder,
+      ['nationality', 'identityIssueCountry'], // relations
+      ['name', 'email'], // search fields
+      filters,
+      ['identityType', 'notificationsEnabled', 'identityNumber', 'identityOtherType', 'birthDate', 'phoneNumber'] // extra selects
+    );
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+    const exportData = users.map(u => {
+      const userLink = `${frontendUrl}/dashboard/users?view=${u.id}`;
+
+      return {
+        name: {
+          formula: `HYPERLINK("${userLink}", "${u.name}")`,
+          result: u.name // Fallback text
+        },
+        email: u.email,
+        role: u.role?.toUpperCase(),
+        status: u.status?.toUpperCase(),
+        phoneNumber: u.phoneNumber || 'N/A',
+        birthDate: u.birthDate ? new Date(u.birthDate).toLocaleDateString() : 'N/A',
+        nationality: u.nationality ? (u.nationality.name || u.nationality.name_ar) : 'N/A',
+        identityType: u.identityType || 'N/A',
+        identityNumber: u.identityNumber || 'N/A',
+        identityOtherType: (u.identityType === 'other' && u.identityOtherType) ? u.identityOtherType : 'N/A',
+        identityIssueCountry: u.identityIssueCountry ? (u.identityIssueCountry.name || u.identityIssueCountry.name_ar) : 'N/A',
+        shortAddress: u.shortAddress || 'N/A',
+        notificationsEnabled: u.notificationsEnabled ? 'Yes' : 'No',
+        lastLogin: u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never',
+        createdAt: new Date(u.created_at).toLocaleDateString(),
+        updatedAt: u.updated_at ? new Date(u.updated_at).toLocaleDateString() : 'N/A',
+      };
+    });
+
+    // Define columns
+    const columns = [
+      {
+        header: 'Name', key: 'name', width: 25, style: {
+          font: {
+            color: { argb: 'FF0000FF' }, // Classic link blue
+            underline: true
+          }
+        }
+      },
+      { header: 'Email', key: 'email', width: 35 },
+      { header: 'Role', key: 'role', width: 12 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Phone Number', key: 'phoneNumber', width: 18 },
+      { header: 'Birth Date', key: 'birthDate', width: 15 },
+      { header: 'Nationality', key: 'nationality', width: 20 },
+      { header: 'Identity Type', key: 'identityType', width: 18 },
+      { header: 'Identity Number', key: 'identityNumber', width: 20 },
+      { header: 'Identity Other Type', key: 'identityOtherType', width: 20 },
+      { header: 'Identity Issue Country', key: 'identityIssueCountry', width: 25 },
+      { header: 'Short Address', key: 'shortAddress', width: 15 },
+      { header: 'Notifications Enabled', key: 'notificationsEnabled', width: 20 },
+      { header: 'Last Login', key: 'lastLogin', width: 15 },
+      { header: 'Created At', key: 'createdAt', width: 15 },
+    ];
+
+    return this.exportService.generateExcel('Users', exportData, columns);
   }
 }

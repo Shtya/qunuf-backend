@@ -9,11 +9,10 @@ export class ContractFilterDto extends PaginationDto {
     search?: string;
 
     @IsOptional()
-    @IsEnum(ContractStatus)
     status?: ContractStatus | 'all' = 'all';
 
     @IsOptional()
-    @IsIn(['created_at', 'totalAmount', 'durationInMonths'])
-    declare sortBy?: 'created_at' | 'totalAmount' | 'durationInMonths';
+    @IsIn(['created_at', 'propertyName', 'status', 'contractNumber', "tenantName", "landlordName", "startDate", "endDate", "totalAmount"])
+    declare sortBy?: 'created_at' | 'propertyName' | 'status' | 'contractNumber' | "tenantName" | "landlordName" | "startDate" | "endDate" | "totalAmount";
 
 }

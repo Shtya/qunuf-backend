@@ -1,6 +1,7 @@
 import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { IsFutureDateOrToday, IsPastDate } from 'src/common/utils/validators';
 
 export class CreateContractDto {
     @ApiProperty({ example: 'uuid-of-property' })
@@ -9,7 +10,7 @@ export class CreateContractDto {
     propertyId: string;
 
     @ApiProperty({ example: '2026-02-01' })
-    @IsDateString()
+    @IsDateString() @IsFutureDateOrToday()
     startDate: string;
 
     @ApiProperty({

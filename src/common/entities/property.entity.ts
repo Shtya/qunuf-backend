@@ -1,7 +1,8 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { CoreEntity } from './coreEntity';
 import { User } from './user.entity';
 import { State } from './state.entity';
+import { generateSlugHelper } from '../utils/helpers';
 // --- Enums المحدثة بقيم Small Case ---
 
 export enum PropertyType {
@@ -71,7 +72,7 @@ export enum PropertyStatus {
 
 @Entity('properties')
 export class Property extends CoreEntity {
-    @Column({ name: 'name' })
+    @Column({ name: 'name', unique: true })
     name: string;
 
     @Column({ type: 'text', name: 'description' })
@@ -222,5 +223,19 @@ export class Property extends CoreEntity {
 
     @Column({ type: 'uuid', name: 'state_id', nullable: true })
     stateId: string | null;
+
+
+    @Column({ unique: true })
+    slug: string;
+
+
+    @BeforeInsert()
+    @BeforeUpdate() // Keeps the slug in sync if the title changes
+    generateSlug() {
+        if (this.name) {
+            this.slug = generateSlugHelper(this.name)
+        }
+
+    }
 
 }

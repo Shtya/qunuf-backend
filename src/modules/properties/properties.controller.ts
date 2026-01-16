@@ -34,7 +34,7 @@ export class PropertiesController {
     @Body() dto: CreatePropertyDto
   ) {
     const imagePaths = files.images?.map(f => `uploads/images/properties/${f.filename}`) || [];
-    const docPath = files.documentImage?.[0] ? `uploads/images/properties/${files.documentImage[0].filename}` : null;
+    const docPath = files.documentImage?.[0] ? `uploads/documents/properties/${files.documentImage[0].filename}` : null;
 
     const doc = docPath ? { path: docPath, filename: files.documentImage?.[0].originalname } : null;
     // Logic inside service sets status to PENDING and links userId
@@ -54,7 +54,7 @@ export class PropertiesController {
     @Body() dto: UpdatePropertyDto
   ) {
     const imagePaths = files.images?.map(f => `uploads/images/properties/${f.filename}`) || [];
-    const docPath = files.documentImage?.[0] ? `uploads/images/properties/${files.documentImage[0].filename}` : null;
+    const docPath = files.documentImage?.[0] ? `uploads/documents/properties/${files.documentImage[0].filename}` : null;
 
     const doc = docPath ? { path: docPath, filename: files.documentImage?.[0].originalname } : null;
     return this.propertiesService.update(user.id, id, dto, imagePaths, doc);
@@ -89,10 +89,10 @@ export class PropertiesController {
   }
 
   // --- GUEST (PUBLIC) ---
-  @Get(':id/details')
+  @Get(':slug/details')
   @ApiOperation({ summary: 'Guest: Get general property details (Limited info)' })
-  async getPublicDetails(@Param('id') id: string) {
-    return this.propertiesService.findOneForGuest(id);
+  async getPublicDetails(@Param('slug') slug: string) {
+    return this.propertiesService.findOneForGuest(slug);
   }
 
 
@@ -136,5 +136,15 @@ export class PropertiesController {
   @ApiOperation({ summary: 'Guest: Advanced property search' })
   async search(@Query() query: GuestPropertySearchDto) {
     return this.propertiesService.searchProperties(query);
+  }
+
+  @Get('check-slug')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  @ApiOperation({ summary: 'Check if property name/slug is unique' })
+  async checkSlug(
+    @Query('name') name: string,
+    @Query('excludeId') excludeId?: string,
+  ) {
+    return this.propertiesService.checkSlugUniqueness(name, excludeId);
   }
 }

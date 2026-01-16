@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
+import { DataSource, In, LessThanOrEqual, Repository } from 'typeorm';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { Contract, ContractStatus, PaymentInstallment, PropertySnapshot, UserSnapshot } from 'src/common/entities/contract.entity';
 import { Property, PropertyType, RentType } from 'src/common/entities/property.entity';
@@ -17,6 +17,7 @@ import { CRUD } from 'src/common/services/crud.service';
 import { RenewRequest, RenewStatus } from 'src/common/entities/renew_request';
 import { RenewFilterDto } from './dto/renew_filter.dto';
 import { ContractDataMasker } from 'src/common/utils/contractDataMasker';
+import { ExportService } from 'src/common/services/exportService';
 
 @Injectable()
 export class ContractsService {
@@ -33,20 +34,27 @@ export class ContractsService {
     private renewRepo: Repository<RenewRequest>,
     private notificationService: NotificationService,
     private dataSource: DataSource,
+    private readonly exportService: ExportService,
   ) { }
 
   private readonly RENT_MONTH_DAYS = 30
   private readonly MAX_RENT_YEAR_RESIDENTIAL = 1
   private readonly MAX_RENT_YEAR_COMMERCIAL = 5
 
+
+
   async create(tenantId: string, dto: CreateContractDto) {
-    const tenant = await this.userRepo.findOne({
-      where: { id: tenantId },
-      relations: ['nationality', 'identityIssueCountry']
-      //'address', 
-    });
+    const tenant = await this.userRepo
+      .createQueryBuilder('user')
+      .where('user.id = :id', { id: tenantId })
+      .leftJoinAndSelect('user.nationality', 'nationality')
+      .leftJoinAndSelect('user.identityIssueCountry', 'identityIssueCountry')
+      .addSelect(['user.identityType', 'user.notificationsEnabled', 'user.identityNumber', 'user.identityOtherType', 'user.birthDate', 'user.phoneNumber'])
+      .getOne();
+
+
     // 1. Fetch tenant 
-    if (!tenant) throw new NotFoundException('Tenant not found');
+    if (!tenant) throw new NotFoundException('User not found');
     this.validateTenantProfile(tenant);
 
     // 2. Fetch Property 
@@ -154,7 +162,7 @@ export class ContractsService {
       currentTerms: dto.proposedTerms || defaultTerms, // Tenant might have sent edits immediately
 
       platformFeePercentage: settings?.platformPercent,
-      platformFeeAmount: (settings?.platformPercent ?? 2.5 / 100) * oneYearRentAmount,
+      platformFeeAmount: ((settings?.platformPercent ?? 2.5) / 100) * oneYearRentAmount,
       // Status: Waiting for Landlord
       status: ContractStatus.PENDING_LANDLORD_ACCEPTANCE
     });
@@ -201,6 +209,7 @@ export class ContractsService {
 
     return ContractDataMasker.mask(savedContract, tenant.role);
   }
+
 
   private validateTenantProfile(user: User) {
     const missingFields: string[] = [];
@@ -326,8 +335,55 @@ export class ContractsService {
     return installments;
   }
 
-  // ... inside ContractsService
 
+  async allowToCreateContract(userId: string, propertyId: string) {
+    // 1. Fetch User and Property in parallel to save time
+    const [tenant, property] = await Promise.all([
+      this.userRepo.findOne({ where: { id: userId }, select: ['id'] }),
+      this.propertyRepo.findOne({ where: { id: propertyId }, select: ['id', 'status', 'rentType', 'isRented'] })
+    ]);
+
+    if (!tenant) throw new NotFoundException('User not found');
+    if (!property) throw new NotFoundException('Property not found');
+
+    // 2. Check if property is already rented
+    if (property.isRented) {
+      return {
+        allowed: false,
+        message: 'This property is currently occupied.'
+      };
+    }
+
+    // 3. Check for existing active/pending contracts
+    const existingContract = await this.contractRepo.findOne({
+      where: {
+        propertyId: propertyId,
+        tenantId: userId,
+        status: In([
+          ContractStatus.PENDING_LANDLORD_ACCEPTANCE,
+          ContractStatus.PENDING_SIGNATURE,
+          ContractStatus.PENDING_TENANT_ACCEPTANCE,
+          ContractStatus.PENDING_TERMINATION
+        ])
+      },
+      select: ['id', 'status'] // Only fetch what we need
+    });
+
+    if (existingContract) {
+      return {
+        allowed: false,
+        message: "You already have a pending contract for this property.",
+        contractId: existingContract.id // Provide ID for redirection
+      };
+    }
+
+    // 4. Success: All checks passed
+    return {
+      allowed: true,
+      message: 'Tenant is eligible to create a contract.',
+      property
+    };
+  }
   /**
    * 1. Landlord updates terms and sends back to Tenant
    */
@@ -463,7 +519,7 @@ export class ContractsService {
     const contract = await this.contractRepo.findOne({ where: { id: contractId }, relations: ['tenant', 'landlord'] });
     if (!contract) throw new NotFoundException('Contract not found');
 
-    if (user.id !== contract.landlordId || user.id !== contract.tenantId) {
+    if (user.id !== contract.landlordId && user.id !== contract.tenantId) {
       throw new UnauthorizedException('You do not have permission to cancel this contract.');
     }
     // Validation: Only allow cancel if it's currently their turn
@@ -562,8 +618,22 @@ export class ContractsService {
     });
 
     if (!contract) throw new NotFoundException('Contract not found');
-    if (contract.status !== ContractStatus.ACTIVE) {
-      throw new BadRequestException('Only active contracts can be terminated.');
+    const isAllowedStatus =
+      contract.status === ContractStatus.ACTIVE ||
+      contract.status === ContractStatus.PENDING_TERMINATION;
+
+    if (!isAllowedStatus) {
+      throw new BadRequestException('Only active or pending termination contracts can be processed for termination.');
+    }
+
+    // 2. Check Permissions (User must be part of the contract)
+    if (user.id !== contract.landlordId && user.id !== contract.tenantId) {
+      throw new UnauthorizedException('You do not have permission to terminate this contract.');
+    }
+
+    // 3. Role-specific constraints (Optional: based on your snippet)
+    if (contract.status === ContractStatus.PENDING_TERMINATION && user.role !== UserRole.TENANT) {
+      throw new BadRequestException('Only the tenant can finalize the termination of this contract.');
     }
 
     const now = new Date();
@@ -895,15 +965,34 @@ export class ContractsService {
       filters.status = query.status;
     }
 
+    const sortMap: Record<string, string> = {
+      tenantName: 'tenant.name',
+      landlordName: 'landlord.name',
+      propertyName: 'property.name',
+      startDate: 'startDate',
+      endDate: 'endDate',
+      totalAmount: 'totalAmount',
+      contractNumber: 'contractNumber',
+      status: 'status',
+      created_at: 'created_at'
+    };
+
+    // Use the mapped value, or default to 'createdAt' if not found
+    const mappedSortBy = sortMap[query.sortBy || 'created_at'] || 'created_at';
+
     const result = await CRUD.findAll<Contract>(
       this.contractRepo,
       'contract',
       query.search,
       query.page,
       query.limit,
-      query.sortBy,
+      mappedSortBy,
       query.sortOrder,
-      [],
+      [
+        { name: 'property', select: ['id', 'images', 'name', 'slug', 'status'] },
+        { name: 'tenant', select: ['id', 'name', 'imagePath'] },
+        { name: 'landlord', select: ['id', 'name', 'imagePath'] }
+      ],
       [
         'landlordSnapshot.name',
         'propertySnapshot.name',
@@ -914,6 +1003,138 @@ export class ContractsService {
     );
     const records = ContractDataMasker.mask(result.records, user.role);
     return { ...result, records };
+  }
+
+  async exportContracts(user: any, query: ContractFilterDto) {
+    const filters: Record<string, any> = {};
+
+    if (user.role === UserRole.LANDLORD) {
+      filters.landlordId = user.id;
+    } else if (user.role === UserRole.TENANT) {
+      filters.tenantId = user.id;
+    }
+
+    if (query.status && query.status !== 'all') {
+      filters.status = query.status;
+    }
+
+    const sortMap: Record<string, string> = {
+      tenantName: 'tenant.name',
+      landlordName: 'landlord.name',
+      propertyName: 'property.name',
+      startDate: 'startDate',
+      endDate: 'endDate',
+      totalAmount: 'totalAmount',
+      contractNumber: 'contractNumber',
+      status: 'status',
+      created_at: 'created_at'
+    };
+
+    const mappedSortBy = sortMap[query.sortBy || 'created_at'] || 'created_at';
+
+    const { records: contracts } = await CRUD.findAllLimited<Contract>(
+      this.contractRepo,
+      'contract',
+      query.limit || 1000,
+      query.search,
+      mappedSortBy,
+      query.sortOrder,
+      [
+        { name: 'property', select: ['id', 'name', 'slug'] },
+        { name: 'tenant', select: ['id', 'name'] },
+        { name: 'landlord', select: ['id', 'name'] }
+      ],
+      [
+        'landlordSnapshot.name',
+        'propertySnapshot.name',
+        'tenantSnapshot.name'
+      ],
+      filters,
+      []
+    );
+
+    // Apply data masking based on user role
+    const maskedContracts = ContractDataMasker.mask(contracts, user.role);
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+    const exportData = maskedContracts.map(c => {
+      const contractLink = `${frontendUrl}/dashboard/contracts?view=${c.id}`;
+      const property = c.propertySnapshot;
+      const tenant = c.tenantSnapshot;
+      const landlord = c.landlordSnapshot;
+
+      return {
+        contractNumber: {
+          formula: `HYPERLINK("${contractLink}", "${c.contractNumber || c.id.slice(0, 8)}")`,
+          result: c.contractNumber || c.id.slice(0, 8)
+        },
+        propertyName: property?.name || 'N/A',
+        propertyType: property?.type || 'N/A',
+        propertySubType: property?.subType || 'N/A',
+        propertyArea: property?.area ? `${property.area} m²` : 'N/A',
+        propertyLocation: property?.stateName || 'N/A',
+        tenantName: tenant?.name || 'N/A',
+        tenantEmail: tenant?.email || 'N/A',
+        tenantPhone: tenant?.phoneNumber || 'N/A',
+        landlordName: landlord?.name || 'N/A',
+        landlordEmail: landlord?.email || 'N/A',
+        landlordPhone: landlord?.phoneNumber || 'N/A',
+        startDate: c.startDate ? new Date(c.startDate).toLocaleDateString() : 'N/A',
+        endDate: c.endDate ? new Date(c.endDate).toLocaleDateString() : 'N/A',
+        duration: `${c.durationInMonths} months`,
+        rentType: c.rentType || 'N/A',
+        totalAmount: `${Number(c.totalAmount).toLocaleString()} SAR`,
+        securityDeposit: `${Number(c.securityDeposit).toLocaleString()} SAR`,
+        platformFeePercentage: `${c.platformFeePercentage}%`,
+        platformFeeAmount: `${Number(c.platformFeeAmount).toLocaleString()} SAR`,
+        status: c.status?.toUpperCase() || 'N/A',
+        contractDate: c.contractDate ? new Date(c.contractDate).toLocaleDateString() : 'N/A',
+        terminationDate: c.terminationEffectiveDate ? new Date(c.terminationEffectiveDate).toLocaleDateString() : 'N/A',
+        paymentSchedule: c.paymentSchedule?.length ? `${c.paymentSchedule.length} installments` : 'N/A',
+        createdAt: new Date(c.created_at).toLocaleDateString(),
+      };
+    });
+
+    const columns = [
+      {
+        header: 'Contract Number',
+        key: 'contractNumber',
+        width: 20,
+        style: {
+          font: {
+            color: { argb: 'FF0000FF' },
+            underline: true
+          }
+        }
+      },
+      { header: 'Property Name', key: 'propertyName', width: 25 },
+      { header: 'Property Type', key: 'propertyType', width: 15 },
+      { header: 'Property Sub-Type', key: 'propertySubType', width: 18 },
+      { header: 'Property Area', key: 'propertyArea', width: 15 },
+      { header: 'Property Location', key: 'propertyLocation', width: 18 },
+      { header: 'Tenant Name', key: 'tenantName', width: 20 },
+      { header: 'Tenant Email', key: 'tenantEmail', width: 25 },
+      { header: 'Tenant Phone', key: 'tenantPhone', width: 15 },
+      { header: 'Landlord Name', key: 'landlordName', width: 20 },
+      { header: 'Landlord Email', key: 'landlordEmail', width: 25 },
+      { header: 'Landlord Phone', key: 'landlordPhone', width: 15 },
+      { header: 'Start Date', key: 'startDate', width: 15 },
+      { header: 'End Date', key: 'endDate', width: 15 },
+      { header: 'Duration', key: 'duration', width: 12 },
+      { header: 'Rent Type', key: 'rentType', width: 12 },
+      { header: 'Total Amount', key: 'totalAmount', width: 15 },
+      { header: 'Security Deposit', key: 'securityDeposit', width: 15 },
+      { header: 'Platform Fee %', key: 'platformFeePercentage', width: 12 },
+      { header: 'Platform Fee Amount', key: 'platformFeeAmount', width: 18 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Contract Date', key: 'contractDate', width: 15 },
+      { header: 'Termination Date', key: 'terminationDate', width: 18 },
+      { header: 'Payment Schedule', key: 'paymentSchedule', width: 18 },
+      { header: 'Created At', key: 'createdAt', width: 15 },
+    ];
+
+    return this.exportService.generateExcel('Contracts', exportData, columns);
   }
 
   async acceptRenewOffer(renewRequestId: string, tenantId: string) {
@@ -982,7 +1203,7 @@ export class ContractsService {
     const settings = await this.settingsRepo.findOne({ where: {} });
     const platformFeePercent = settings?.platformPercent ?? 2.5;
     // If contract > 1 year, fee logic might differ, keeping it simple based on total for now:
-    const newPlatformFeeAmount = (platformFeePercent ?? 2.5 / 100) * oneYearRentAmount;
+    const newPlatformFeeAmount = (platformFeePercent / 100) * oneYearRentAmount;
 
     // 6. Create New Contract Entity
     const newContract = this.contractRepo.create({

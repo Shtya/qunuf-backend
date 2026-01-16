@@ -4,6 +4,8 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { SettingsService } from '../settings/settings.service';
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Settings } from 'src/common/entities/settings.entity';
+import { Blog } from 'src/common/entities/blog.entity';
+import path from 'path';
 
 @Injectable()
 export class EmailService {
@@ -25,13 +27,14 @@ export class EmailService {
     }
 
 
-    private async sendMail(to: string, subject: string, template: string, context: any) {
+    private async sendMail(to: string | string[], subject: string, template: string, context: any, bcc?: string[], attachments?: any[]) {
         const settings = await this.getAppSettings();
 
 
 
         return this.mailerService.sendMail({
             to,
+            bcc,
             from: settings.contactEmail || process.env.SMTP_FROM,
             subject,
             template,
@@ -42,8 +45,45 @@ export class EmailService {
                 appAddress: settings.address || process.env.APP_CONTACT_ADDRESS,
                 ...context,
             },
+            attachments,
         });
     }
+
+    async sendNewBlogNotification(subscribers: string[], blog: Blog) {
+        if (!subscribers.length) return;
+
+        const settings = await this.getAppSettings();
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:8081';
+
+        // 
+        const description = blog.description_en
+            ? blog.description_en.substring(0, 150)
+            : 'Check out our latest article on our platform.';
+
+        const imageAbsolutePath = path.join(process.cwd(), blog.imagePath.replace(/^\/+/, ''));
+        console.log('Attaching image from:', imageAbsolutePath);
+        return this.sendMail(
+            settings.contactEmail || 'no-reply@example.com',
+            `New Post: ${blog.title_en}`,
+            'new-blog',
+            {
+                blogTitle: blog.title_en,
+                blogDescription: description,
+                blogLink: `${frontendUrl}/blogs/${blog.slug}`,
+                blogImageCid: 'blogImage'
+            },
+            subscribers,
+            [
+                {
+                    filename: 'blog-image.png',
+                    path: imageAbsolutePath,
+                    cid: 'blogImage' // This must match the variable used in context
+                }
+            ]
+        );
+    }
+
 
     async sendVerificationEmail(to: string, verificationLink: string) {
         return this.sendMail(to, 'Verify your account', 'verification', {
@@ -100,5 +140,6 @@ export class EmailService {
             name,
         });
     }
+
 
 }

@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { InjectRepository } from '@nestjs/typeorm';
 import { Property, PropertyStatus } from 'src/common/entities/property.entity';
 import { User, UserRole } from 'src/common/entities/user.entity';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { LessThanOrEqual, Not, Repository } from 'typeorm';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { unlinkSync, existsSync } from 'fs';
@@ -12,8 +12,9 @@ import { CRUD, CustomPaginatedResponse } from 'src/common/services/crud.service'
 import { State } from 'src/common/entities/state.entity';
 import { GuestPropertySearchDto } from './dto/guest-property-search.dto';
 import { NotificationService } from '../notification/notification.service';
-import { trimText } from 'src/common/utils/helpers';
+import { generateSlugHelper, trimText } from 'src/common/utils/helpers';
 import { ExportService } from 'src/common/services/exportService';
+import { UserDataMasker } from 'src/common/utils/UserDataMasker';
 
 @Injectable()
 export class PropertiesService {
@@ -38,6 +39,13 @@ export class PropertiesService {
         imagePaths: string[],
         doc: { path: string, filename: string } | null,
     ): Promise<Property> {
+        const slug = generateSlugHelper(dto.name);
+
+        const existing = await this.propertyRepo.findOne({ where: { slug } });
+        if (existing) {
+            throw new BadRequestException(`Property with title "${dto.name}" already exists`)
+        }
+
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) {
             throw new NotFoundException('User not found');
@@ -89,9 +97,26 @@ export class PropertiesService {
         if (!property) throw new NotFoundException('Property not found');
         if (property.userId !== userId) throw new ForbiddenException('You do not own this property');
 
+
         // Prevent update if inactive or rejected
         if ([PropertyStatus.INACTIVE, PropertyStatus.REJECTED].includes(property.status)) {
-            throw new BadRequestException('Cannot update property in its current state');
+            throw new BadRequestException(
+                `Cannot update property because its status is ${property.status}`
+            );
+        }
+
+        let newSlug = property.slug;
+        if (dto.name && dto.name !== property.name) {
+            newSlug = generateSlugHelper(dto.name); // Your regex helper
+
+            // Check if this slug is already taken by ANOTHER blog
+            const slugExists = await this.propertyRepo.findOne({
+                where: { slug: newSlug, id: Not(property.id) }
+            });
+
+            if (slugExists) {
+                throw new BadRequestException(`A Property with the title "${dto.name}" already exists.`);
+            }
         }
 
         if (dto.stateId) {
@@ -215,6 +240,8 @@ export class PropertiesService {
         const property = await this.propertyRepo.findOne({ where: { id } });
         if (!property) throw new NotFoundException('Property not found');
 
+
+
         property.status = status;
         const updatedProperty = await this.propertyRepo.save(property);
 
@@ -260,10 +287,12 @@ export class PropertiesService {
     /**
      * Guest Action: Shows only Active properties and hides sensitive legal data
      */
-    async findOneForGuest(id: string) {
+    async findOneForGuest(slug: string) {
         const property = await this.propertyRepo.findOne({
-            where: { id, status: PropertyStatus.ACTIVE },
+            where: { slug, status: PropertyStatus.ACTIVE },
+            relations: ['user']
         });
+
 
         if (!property) throw new NotFoundException('Property not found or not available');
 
@@ -279,6 +308,8 @@ export class PropertiesService {
             ...publicData
         } = property;
 
+        const maskedUser = UserDataMasker.mask(publicData.user)
+        publicData.user = maskedUser;
         return publicData;
     }
 
@@ -339,62 +370,72 @@ export class PropertiesService {
     async searchProperties(query: GuestPropertySearchDto): Promise<CustomPaginatedResponse<Property>> {
         const {
             page = 1, limit = 10, sortBy = 'created_at', sortOrder = 'DESC',
-            stateId, rentType, propertyType, subType, isFurnished,
-            minPrice, maxPrice, minArea, maxArea, constructionDate,
-            bedrooms, bathrooms, livingRooms, maidRoom
+            stateId, rentType, propertyType, subTypes, isFurnished,
+            minPrice, maxPrice, minArea, maxArea, minYear, maxYear,
+            bathroom, bedroom, features
         } = query;
 
         const queryBuilder = this.propertyRepo.createQueryBuilder('p');
 
-        queryBuilder.select([
-            'p.id',
-            'p.name',
-            'p.description',
-            'p.additionalDetails',
-            'p.educationInstitutions',
-            'p.healthMedicalFacilities',
-            'p.status',
-            'p.images',
-            'p.propertyType',
-            'p.subType',
-            'p.area',
-            'p.constructionDate',
-            'p.rentPrice',
-            'p.rentType',
-            'p.isFurnished',
-            'p.facilities',
-            'p.features',
-            'p.nationalAddressCode',
-            'p.latitude',
-            'p.longitude',
-            'p.created_at',
-            'p.complexName',
-            'p.capacity'
-        ]);
-
-        // 1. Mandatory Security Filter: Only Active Properties
+        // Basic internal filters
         queryBuilder.where('p.status = :status', { status: PropertyStatus.ACTIVE });
         queryBuilder.andWhere('p.isRented = :isRented', { isRented: false });
 
-        // 2. Basic Column Filters
-        if (stateId) queryBuilder.andWhere('p.nationalAddressCode LIKE :stateId', { stateId: `${stateId}%` });
-        if (rentType) queryBuilder.andWhere('p.rentType = :rentType', { rentType });
-        if (propertyType) queryBuilder.andWhere('p.propertyType = :propertyType', { propertyType });
-        if (subType) queryBuilder.andWhere('p.subType = :subType', { subType });
-        if (isFurnished !== undefined) queryBuilder.andWhere('p.isFurnished = :isFurnished', { isFurnished });
-        if (constructionDate) queryBuilder.andWhere('p.constructionDate >= :constructionDate', { constructionDate });
+        // Location (UUID stateId)
+        if (stateId) queryBuilder.andWhere('p.state_id = :stateId', { stateId });
 
-        // 3. Range Filters (Price & Area)
-        if (minPrice) queryBuilder.andWhere('p.rentPrice >= :minPrice', { minPrice });
-        if (maxPrice) queryBuilder.andWhere('p.rentPrice <= :maxPrice', { maxPrice });
+        if (rentType) queryBuilder.andWhere('p.rent_type = :rentType', { rentType });
+        if (propertyType) queryBuilder.andWhere('p.property_type = :propertyType', { propertyType });
+
+        // Multi-select Subtypes
+        if (subTypes && subTypes.length > 0) {
+            queryBuilder.andWhere('p.sub_type IN (:...subTypes)', { subTypes });
+        }
+
+        if (isFurnished !== undefined) {
+            queryBuilder.andWhere('p.is_furnished = :isFurnished', { isFurnished });
+        }
+
+        // --- Facility Logic (Bathrooms/Bedrooms) ---
+        if (bathroom && bathroom !== 'all') {
+            if (bathroom === 'threeAndMore') {
+                queryBuilder.andWhere("(p.facilities->>'bathrooms')::float >= 3");
+            } else {
+                const val = bathroom.replace('_', '.'); // '1_5' -> '1.5'
+                queryBuilder.andWhere("(p.facilities->>'bathrooms')::float = :bathVal", { bathVal: parseFloat(val) });
+            }
+        }
+
+        if (bedroom && bedroom !== 'all') {
+            if (bedroom === 'fiveAndMore') {
+                queryBuilder.andWhere("(p.facilities->>'bedrooms')::int >= 5");
+            } else {
+                queryBuilder.andWhere("(p.facilities->>'bedrooms')::int = :bedVal", { bedVal: parseInt(bedroom) });
+            }
+        }
+
+        // --- Features Logic (Boolean flags inside JSONB) ---
+        if (features && features.length > 0) {
+            features.forEach((feature) => {
+                // Checks if the key exists and is true in the JSONB facilities column
+                queryBuilder.andWhere(`(p.facilities->>:feature)::boolean = true`, { feature });
+            });
+        }
+
+        // --- Range Filters ---
+        if (minPrice) queryBuilder.andWhere('p.rent_price >= :minPrice', { minPrice });
+        if (maxPrice) queryBuilder.andWhere('p.rent_price <= :maxPrice', { maxPrice });
         if (minArea) queryBuilder.andWhere('p.area >= :minArea', { minArea });
         if (maxArea) queryBuilder.andWhere('p.area <= :maxArea', { maxArea });
 
-        // 4. JSONB Facilities Filtering (PostgreSQL Syntax)
-        if (bedrooms) queryBuilder.andWhere("p.facilities->>'bedrooms' = :bedrooms", { bedrooms });
-        if (bathrooms) queryBuilder.andWhere("p.facilities->>'bathrooms' = :bathrooms", { bathrooms });
-        if (livingRooms) queryBuilder.andWhere("p.facilities->>'livingRooms' = :livingRooms", { livingRooms });
-        if (maidRoom !== undefined) queryBuilder.andWhere("p.facilities->>'maidRoom' = :maidRoom", { maidRoom: String(maidRoom) });
+        // Construction Year Range
+        if (minYear) {
+            queryBuilder.andWhere("EXTRACT(YEAR FROM p.construction_date) >= :minYear", { minYear });
+        }
+
+        if (maxYear) {
+            queryBuilder.andWhere("EXTRACT(YEAR FROM p.construction_date) <= :maxYear", { maxYear });
+        }
 
         // 7. Pagination & Sorting
         const skip = (page - 1) * limit;
@@ -423,6 +464,26 @@ export class PropertiesService {
         };
     }
 
+
+    async checkSlugUniqueness(name: string, excludeId?: string): Promise<{ isUnique: boolean }> {
+        if (!name || name.trim().length < 3) {
+            return { isUnique: false };
+        }
+
+        const slug = generateSlugHelper(name.trim());
+
+        const queryBuilder = this.propertyRepo.createQueryBuilder('p')
+            .where('p.slug = :slug', { slug });
+
+        // If editing, exclude the current property from the check
+        if (excludeId) {
+            queryBuilder.andWhere('p.id != :excludeId', { excludeId });
+        }
+
+        const existing = await queryBuilder.getOne();
+
+        return { isUnique: !existing };
+    }
 
     async exportProperties(user: any, query: PropertyFilterDto) {
 

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Patch, Param, UseInterceptors, UseGuards, UploadedFile, BadRequestException, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, Patch, Param, UseInterceptors, UseGuards, UploadedFile, BadRequestException, Get, Query, Res } from '@nestjs/common';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { ApiBody, ApiConsumes, ApiForbiddenResponse, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -13,6 +13,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { ContractFilterDto } from './dto/contract-filter.dto';
 import { ActivateContractDto } from './dto/activate.contract.dto';
 import { RenewFilterDto } from './dto/renew_filter.dto';
+import { Response } from 'express';
 
 @Controller('contracts')
 export class ContractsController {
@@ -72,7 +73,6 @@ export class ContractsController {
       },
     },
   })
-
   @ApiResponse({ status: 200, description: 'Contract activated and Ejar PDF uploaded.' })
   async activateContract(
     @Param('id') id: string,
@@ -90,6 +90,21 @@ export class ContractsController {
   @ApiOperation({ summary: 'Terminate contract (Tenant: Immediate / Landlord: 60-day notice)' })
   async terminate(@Param('id') id: string, @User() user: any) {
     return this.contractsService.terminateContract(id, user.id);
+  }
+
+  @Get('export')
+  @UseGuards(JwtAuthGuard)
+  async export(
+    @User() user: any,
+    @Query() query: ContractFilterDto,
+    @Res() res: Response
+  ) {
+    const buffer = await this.contractsService.exportContracts(user, query);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=contracts_export_${Date.now()}.xlsx`);
+
+    return res.send(buffer);
   }
 
   @Get(':id')
@@ -141,4 +156,16 @@ export class ContractsController {
   ) {
     return this.contractsService.findAllRenewRequests(user, query);
   }
+
+  @Get('check-eligibility/:propertyId')
+  @Auth(UserRole.TENANT)
+  @ApiOperation({ summary: 'Check if tenant can create a contract for a specific property' })
+  async checkEligibility(
+    @User() user: any,
+    @Param('propertyId') propertyId: string
+  ) {
+    return this.contractsService.allowToCreateContract(user.id, propertyId);
+  }
+
+
 }

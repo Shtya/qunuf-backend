@@ -7,4 +7,7 @@ export class ActivateContractDto {
     @IsString()
     @MaxLength(50)
     contractNumber: string;
+
+    @ApiProperty({ type: 'string', format: 'binary' })
+    contractPdf: any;
 }
