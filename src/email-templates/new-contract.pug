@@ -1,0 +1,61 @@
+doctype html
+html
+  head
+    meta(charset="UTF-8")
+    title New Contract Created - #{appName}
+    style.
+      body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+      .content { padding: 30px; }
+      h1 { color: #333; margin-top: 0; font-size: 24px; }
+      h2 { color: #333; font-size: 20px; margin-top: 30px; margin-bottom: 15px; }
+      p { color: #555; line-height: 1.6; font-size: 16px; }
+      .btn { display: inline-block; padding: 12px 24px; background-color: #007bff; color: #ffffff !important; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+      .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; }
+      .review-card { background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
+      .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+      .reviewer-name { font-weight: bold; color: #333; font-size: 16px; }
+      .review-time { color: #888; font-size: 12px; }
+      .review-rating { color: #ffc107; font-size: 18px; margin-bottom: 8px; }
+      .review-text { color: #555; font-size: 14px; line-height: 1.5; }
+      .no-reviews { color: #888; font-style: italic; padding: 20px; text-align: center; }
+      .property-info { display: flex; align-items: center; gap: 6px; background-color: #e7f3ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+      .property-name { font-weight: bold; color: #007bff; font-size: 18px; margin-bottom: 5px; }
+      .property-details { color: #555; font-size: 14px; }
+
+body
+  .container
+    .content
+      p(style="color: #007bff; font-weight: bold; text-transform: uppercase; font-size: 12px;") Contract Created Successfully
+      h1 Your Contract Request Has Been Sent
+      p Your contract request for the property has been sent to the landlord for approval. While you wait, here are some reviews from previous tenants:
+      
+      .property-info
+        .property-name #{propertyName}
+        .property-details #{propertyType} • #{propertyLocation}
+        if averageRatingFormatted
+          .property-details Average Rating: #{averageRatingFormatted} ⭐
+        else
+          .property-details Average Rating: —
+
+      if reviews && reviews.length > 0
+        h2 Property Reviews
+        each review in reviews
+          .review-card
+            .review-header
+              .reviewer-name #{review.reviewerName}
+              .review-time #{review.timeFormatted}
+            .review-rating #{'⭐'.repeat(review.rate)} (#{review.rate}/5)
+            if review.text
+              .review-text #{review.text}
+      else
+        .no-reviews
+          p No reviews available for this property yet.
+      
+      center
+        a.btn(href=contractLink target="_blank") View Contract Details
+        
+    .footer
+      p &copy; 2025 #{appName}. All rights reserved.
+      p #{appAddress}
+      p Contact: #{appContactEmail}

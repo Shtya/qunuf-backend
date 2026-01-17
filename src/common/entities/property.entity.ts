@@ -228,6 +228,9 @@ export class Property extends CoreEntity {
     @Column({ unique: true })
     slug: string;
 
+    @Column('decimal', { precision: 3, scale: 2, nullable: true, default: null, name: 'average_rating' })
+    averageRating: number | null;
+
 
     @BeforeInsert()
     @BeforeUpdate() // Keeps the slug in sync if the title changes

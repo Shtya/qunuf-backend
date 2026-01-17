@@ -5,6 +5,7 @@ import { SettingsService } from '../settings/settings.service';
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { Settings } from 'src/common/entities/settings.entity';
 import { Blog } from 'src/common/entities/blog.entity';
+import { Contract } from 'src/common/entities/contract.entity';
 import path from 'path';
 
 @Injectable()
@@ -139,6 +140,74 @@ export class EmailService {
         await this.sendMail(email, `Password Changed`, 'password-changed-notification', {
             name,
         });
+    }
+
+    async sendContractNotification(
+        tenantEmail: string,
+        contract: Contract,
+        reviews: any[],
+        averageRating: number | null = null
+    ) {
+        const settings = await this.getAppSettings();
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+        // Format reviews with time
+        const formattedReviews = reviews.map(review => ({
+            reviewerName: review.reviewerName,
+            rate: review.rate,
+            timeFormatted: this.formatReviewTime(review.time),
+            text: review.text,
+        }));
+
+        // Get property information from snapshot
+        const propertyName = contract.propertySnapshot?.name || 'Property';
+        const propertyType = contract.propertySnapshot?.type || 'Unknown';
+        const propertyLocation = contract.propertySnapshot?.stateName || 'Unknown';
+
+        // Use provided averageRating or calculate from reviews if not provided
+        const finalAverageRating = averageRating !== null && averageRating !== undefined
+            ? averageRating
+            : (reviews.length > 0
+                ? reviews.reduce((sum, r) => sum + r.rate, 0) / reviews.length
+                : null);
+
+        // Format average rating as string to avoid template errors
+        const averageRatingFormatted = finalAverageRating !== null && finalAverageRating !== undefined
+            ? Number(finalAverageRating).toFixed(1)
+            : null;
+
+        const contractLink = `${frontendUrl}/dashboard/contracts?view=${contract.id}`;
+
+        return this.sendMail(
+            tenantEmail,
+            `Contract Created: ${propertyName}`,
+            'new-contract',
+            {
+                propertyName,
+                propertyType,
+                propertyLocation,
+                averageRating: finalAverageRating,
+                averageRatingFormatted,
+                reviews: formattedReviews,
+                contractLink,
+            }
+        );
+    }
+
+    private formatReviewTime(date: Date | string): string {
+        if (!date) return 'Recently';
+
+        const reviewDate = typeof date === 'string' ? new Date(date) : date;
+        const now = new Date();
+        const diffInMs = now.getTime() - reviewDate.getTime();
+        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+        if (diffInDays === 0) return 'Today';
+        if (diffInDays === 1) return 'Yesterday';
+        if (diffInDays < 7) return `${diffInDays} days ago`;
+        if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
+        if (diffInDays < 365) return `${Math.floor(diffInDays / 30)} months ago`;
+        return `${Math.floor(diffInDays / 365)} years ago`;
     }
 
 

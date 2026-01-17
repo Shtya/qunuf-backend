@@ -24,8 +24,8 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { NotificationModule } from './modules/notification/notification.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { ContractAutoTerminatorService } from './common/backgroundServices/contract_auto_terminator_service';
-import { ContractsService } from './modules/contracts/contracts.service';
 import { ContractAutoRenewTerminatorService } from './common/backgroundServices/contact_auto_renew_terminator_service';
 import { SharedModule } from './modules/shared.module';
 
@@ -83,7 +83,8 @@ import { SharedModule } from './modules/shared.module';
     ConversationsModule,
     NotificationModule,
     PropertiesModule,
-    ContractsModule
+    ContractsModule,
+    ReviewsModule
   ],
   controllers: [AppController, AuthController],
   providers: [CustomValidationPipe, ContractAutoTerminatorService, ContractAutoRenewTerminatorService],

@@ -870,7 +870,8 @@ export class ContractsService {
             originalContractId: contract.id,
             tenantId: contract.tenantId,
             offeredDiscountAmount: contract.renewalDiscountAmount || 0,
-            status: RenewStatus.PENDING
+            status: RenewStatus.PENDING,
+            propertyId: contract.propertyId,
           });
           const savedRenew = await transactionalEntityManager.save(renewRequest);
 
@@ -1420,7 +1421,7 @@ export class ContractsService {
       query.limit,
       query.sortBy || 'created_at',
       query.sortOrder || 'DESC',
-      ['originalContract'],
+      ['originalContract', 'property'],
       [],
       filters,
       []

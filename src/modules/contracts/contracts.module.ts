@@ -8,6 +8,8 @@ import { Settings } from 'src/common/entities/settings.entity';
 import { NotificationModule } from '../notification/notification.module';
 import { User } from 'src/common/entities/user.entity';
 import { RenewRequest } from 'src/common/entities/renew_request';
+import { ContractSubscriber } from './contract.subscriber';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
@@ -19,9 +21,10 @@ import { RenewRequest } from 'src/common/entities/renew_request';
       RenewRequest
     ]),
     NotificationModule, // ⬅️ required for NotificationService
+    EmailModule, // ⬅️ required for EmailService
   ],
   controllers: [ContractsController],
-  providers: [ContractsService],
+  providers: [ContractsService, ContractSubscriber],
   exports: [ContractsService]
 })
 export class ContractsModule { }

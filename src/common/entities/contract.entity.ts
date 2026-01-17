@@ -211,6 +211,8 @@ export class Contract extends CoreEntity {
     })
     status: ContractStatus;
 
-
+    // contract.entity.ts
+    @Column({ type: 'boolean', default: false })
+    isReviewed: boolean;
 
 }
