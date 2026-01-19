@@ -8,7 +8,7 @@ import { deleteFile } from "src/common/utils/file.util";
 import { CRUD } from "src/common/services/crud.service";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { generateSlugHelper } from "src/common/utils/helpers";
-
+import { faker } from '@faker-js/faker';
 
 @Injectable()
 export class BlogsService {
