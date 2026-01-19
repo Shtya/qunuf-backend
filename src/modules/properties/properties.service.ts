@@ -662,4 +662,29 @@ export class PropertiesService {
 
         return this.exportService.generateExcel('Properties', exportData, columns);
     }
+
+    async getRecentProperties(user: any) {
+        const filters: Record<string, any> = {};
+
+        if (user.role === UserRole.LANDLORD) {
+            filters.userId = user.id;
+        }
+
+        const properties = await this.propertyRepo.find({
+            where: filters,
+            order: { created_at: 'DESC' },
+            take: 7,
+            select: ['id', 'name', 'slug', 'images', 'created_at', 'averageRating'],
+        });
+
+        return properties.map((property) => ({
+            id: property.id,
+            name: property.name,
+            slug: property.slug,
+            imageSrc: property.images?.find((img) => img.is_primary)?.url || property.images?.[0]?.url || '',
+            address: property.name,
+            date: property.created_at,
+            rating: property.averageRating || 0,
+        }));
+    }
 }

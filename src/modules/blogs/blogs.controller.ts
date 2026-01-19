@@ -44,9 +44,9 @@ export class BlogsController {
     @ApiResponse({ status: 200, description: 'Returns a list of blogs and the next cursor' })
     async list(
         @Query('cursor') cursor?: string,
-        @Query('limit') limit: number = 20
+        @Query('limit') limit: number = 9
     ) {
-        const safeLimit = Math.min(Number(limit) || 20, 20);
+        const safeLimit = Math.min(Number(limit) || 20, 9);
 
         const parsedCursor = decodeCursor(cursor);
 

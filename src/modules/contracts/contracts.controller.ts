@@ -167,5 +167,26 @@ export class ContractsController {
     return this.contractsService.allowToCreateContract(user.id, propertyId);
   }
 
+  @Get('dashboard/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get dashboard statistics (Admin/Landlord/Tenant)' })
+  async getDashboardStats(@User() user: any) {
+    return this.contractsService.getDashboardStats(user);
+  }
+
+  @Get('dashboard/chart-data')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get chart data for dashboard (contracts per day, status breakdown)' })
+  async getDashboardChartData(@User() user: any) {
+    return this.contractsService.getDashboardChartData(user);
+  }
+
+  @Get('dashboard/recent')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get recent contracts for dashboard' })
+  async getRecentContracts(@User() user: any) {
+    return this.contractsService.getRecentContracts(user);
+  }
+
 
 }

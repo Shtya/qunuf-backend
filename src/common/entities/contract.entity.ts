@@ -1,7 +1,8 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToOne, Relation } from 'typeorm';
 import { User } from './user.entity';
 import { CommercialSubType, Property, PropertyType, RentType, ResidentialSubType } from './property.entity';
 import { CoreEntity } from './coreEntity';
+import { Review } from './review.entity';
 
 // Interfaces for Type Safety in JSONB Columns
 export interface UserSnapshot {
@@ -214,5 +215,10 @@ export class Contract extends CoreEntity {
     // contract.entity.ts
     @Column({ type: 'boolean', default: false })
     isReviewed: boolean;
+
+    // contract.entity.ts
+    @OneToOne('Review', (review: Review) => review.contract)
+    review: Relation<Review>;
+
 
 }

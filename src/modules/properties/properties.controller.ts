@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { UserRole } from 'src/common/entities/user.entity';
 import { ApiConsumes, ApiOperation } from '@nestjs/swagger';
@@ -6,6 +6,7 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { User } from 'src/common/decorators/user.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { imageUploadConfig, propertyUploadConfig } from 'src/common/utils/file.util';
 import { PropertyFileValidationPipe } from 'src/common/pipes/property-file-validation.pipe';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -146,5 +147,12 @@ export class PropertiesController {
     @Query('excludeId') excludeId?: string,
   ) {
     return this.propertiesService.checkSlugUniqueness(name, excludeId);
+  }
+
+  @Get('dashboard/recent')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get recent properties for dashboard' })
+  async getRecentProperties(@User() user: any) {
+    return this.propertiesService.getRecentProperties(user);
   }
 }

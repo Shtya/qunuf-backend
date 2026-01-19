@@ -29,8 +29,6 @@ export class NotificationSubscriber
 
     // This will be called by TypeORM when a Notification is inserted
     async afterInsert(event: InsertEvent<Notification>) {
-
-        console.log(event.entity)
         const notif = event.entity;
         if (!notif || !notif.userId) return;
 

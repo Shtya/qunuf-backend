@@ -30,7 +30,7 @@ export class registerDto {
     })
     password: string;
 
-    @ApiProperty({ example: 'TENANT', description: 'Role of the user', enum: UserRole })
-    @IsIn(['TENANT', 'LANDLORD'], { message: 'Role must be either TENANT or LANDLORD' })
+    @ApiProperty({ example: 'tenant', description: 'Role of the user', enum: UserRole })
+    @IsIn(['tenant', 'landlord'], { message: 'Role must be either tenant or landlord' })
     role: UserRole;
 }

@@ -99,7 +99,7 @@ export class EmailService {
     }
 
     async sendPasswordChangedEmail(to: string) {
-        return this.sendMail(to, 'Your password was changed', 'password-changed', {
+        return this.sendMail(to, 'Security Update: Password Reset Successfully', 'password-changed', {
             // any context needed by template
         });
     }
@@ -137,7 +137,7 @@ export class EmailService {
         name: string,
     ) {
 
-        await this.sendMail(email, `Password Changed`, 'password-changed-notification', {
+        await this.sendMail(email, `Security Update: Password Changed`, 'password-changed-notification', {
             name,
         });
     }

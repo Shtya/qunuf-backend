@@ -1,8 +1,9 @@
-import { Entity, Column, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate, OneToMany, Relation } from 'typeorm';
 import { CoreEntity } from './coreEntity';
 import { User } from './user.entity';
 import { State } from './state.entity';
 import { generateSlugHelper } from '../utils/helpers';
+import { Review } from './review.entity';
 // --- Enums المحدثة بقيم Small Case ---
 
 export enum PropertyType {
@@ -231,6 +232,9 @@ export class Property extends CoreEntity {
     @Column('decimal', { precision: 3, scale: 2, nullable: true, default: null, name: 'average_rating' })
     averageRating: number | null;
 
+
+    @OneToMany('Review', (review: Review) => review.property)
+    reviews: Relation<Review[]>
 
     @BeforeInsert()
     @BeforeUpdate() // Keeps the slug in sync if the title changes

@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, LessThanOrEqual, Repository } from 'typeorm';
+import { DataSource, In, LessThan, LessThanOrEqual, Repository } from 'typeorm';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { Contract, ContractStatus, PaymentInstallment, PropertySnapshot, UserSnapshot } from 'src/common/entities/contract.entity';
 import { Property, PropertyType, RentType } from 'src/common/entities/property.entity';
@@ -18,6 +18,7 @@ import { RenewRequest, RenewStatus } from 'src/common/entities/renew_request';
 import { RenewFilterDto } from './dto/renew_filter.dto';
 import { ContractDataMasker } from 'src/common/utils/contractDataMasker';
 import { ExportService } from 'src/common/services/exportService';
+import { Review } from 'src/common/entities/review.entity';
 
 @Injectable()
 export class ContractsService {
@@ -32,6 +33,8 @@ export class ContractsService {
     private settingsRepo: Repository<Settings>,
     @InjectRepository(RenewRequest)
     private renewRepo: Repository<RenewRequest>,
+    @InjectRepository(Review)
+    private reviewRepo: Repository<Review>,
     private notificationService: NotificationService,
     private dataSource: DataSource,
     private readonly exportService: ExportService,
@@ -1430,5 +1433,328 @@ export class ContractsService {
 
     const records = ContractDataMasker.maskRenew(result.records, user.role);
     return { ...result, records };
+  }
+
+  private percentChange(current: number, previous: number): number {
+    if (previous === 0 && current === 0) return 0;
+    if (previous === 0) return 100;
+    return Number((((current - previous) / previous) * 100).toFixed(1));
+  }
+
+  async getDashboardStats(user: any) {
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    if (user.role === UserRole.ADMIN) {
+
+      const [
+        totalPropertiesNow,
+        totalPropertiesBefore,
+
+        freeNow,
+        freeBefore,
+
+        rentedNow,
+        rentedBefore,
+      ] = await Promise.all([
+
+        this.propertyRepo.count(),
+        this.propertyRepo.count({ where: { created_at: LessThan(sevenDaysAgo) } }),
+
+        this.propertyRepo.count({ where: { isRented: false } }),
+        this.propertyRepo.count({
+          where: {
+            isRented: false,
+            created_at: LessThan(sevenDaysAgo),
+          },
+        }),
+
+        this.propertyRepo.count({ where: { isRented: true } }),
+        this.propertyRepo.count({
+          where: {
+            isRented: true,
+            created_at: LessThan(sevenDaysAgo),
+          },
+        }),
+      ]);
+
+      return {
+        totalProperties: {
+          value: totalPropertiesNow,
+          changePercent: this.percentChange(
+            totalPropertiesNow,
+            totalPropertiesBefore
+          ),
+        },
+        freeProperties: {
+          value: freeNow,
+          changePercent: this.percentChange(freeNow, freeBefore),
+        },
+        rentedProperties: {
+          value: rentedNow,
+          changePercent: this.percentChange(rentedNow, rentedBefore),
+        },
+      };
+    }
+
+    if (user.role === UserRole.LANDLORD) {
+
+      const [
+        totalNow,
+        totalBefore,
+
+        freeNow,
+        freeBefore,
+
+        rentedNow,
+        rentedBefore,
+
+        reviewsNow,
+        reviewsBefore,
+      ] = await Promise.all([
+
+        this.propertyRepo.count({ where: { userId: user.id } }),
+        this.propertyRepo.count({
+          where: { userId: user.id, created_at: LessThan(sevenDaysAgo) },
+        }),
+
+        this.propertyRepo.count({ where: { userId: user.id, isRented: false } }),
+        this.propertyRepo.count({
+          where: {
+            userId: user.id,
+            isRented: false,
+            created_at: LessThan(sevenDaysAgo),
+          },
+        }),
+
+        this.propertyRepo.count({ where: { userId: user.id, isRented: true } }),
+        this.propertyRepo.count({
+          where: {
+            userId: user.id,
+            isRented: true,
+            created_at: LessThan(sevenDaysAgo),
+          },
+        }),
+
+        this.reviewRepo.count(),
+        this.reviewRepo.count({
+          where: { created_at: LessThan(sevenDaysAgo) },
+        }),
+      ]);
+
+      return {
+        totalProperties: {
+          value: totalNow,
+          changePercent: this.percentChange(totalNow, totalBefore),
+        },
+        freeProperties: {
+          value: freeNow,
+          changePercent: this.percentChange(freeNow, freeBefore),
+        },
+        rentedProperties: {
+          value: rentedNow,
+          changePercent: this.percentChange(rentedNow, rentedBefore),
+        },
+        totalReviews: {
+          value: reviewsNow,
+          changePercent: this.percentChange(reviewsNow, reviewsBefore),
+        },
+      };
+    }
+
+
+    if (user.role === UserRole.TENANT) {
+
+      const [
+        activeNow,
+        activeBefore,
+
+        pendingNow,
+        pendingBefore,
+
+        ejarNowRaw,
+        ejarBeforeRaw,
+      ] = await Promise.all([
+
+        this.contractRepo.count({
+          where: { tenantId: user.id, status: ContractStatus.ACTIVE },
+        }),
+        this.contractRepo.count({
+          where: {
+            tenantId: user.id,
+            status: ContractStatus.ACTIVE,
+            created_at: LessThan(sevenDaysAgo),
+          },
+        }),
+
+        this.renewRepo.count({
+          where: { tenantId: user.id, status: RenewStatus.PENDING },
+        }),
+        this.renewRepo.count({
+          where: {
+            tenantId: user.id,
+            status: RenewStatus.PENDING,
+            created_at: LessThan(sevenDaysAgo),
+          },
+        }),
+
+        this.contractRepo
+          .createQueryBuilder('c')
+          .select('COALESCE(SUM(c.totalAmount),0)', 'sum')
+          .where('c.tenantId = :id', { id: user.id })
+          .andWhere('c.ejarPdfPath IS NOT NULL')
+          .getRawOne(),
+
+        this.contractRepo
+          .createQueryBuilder('c')
+          .select('COALESCE(SUM(c.totalAmount),0)', 'sum')
+          .where('c.tenantId = :id', { id: user.id })
+          .andWhere('c.ejarPdfPath IS NOT NULL')
+          .andWhere('c.created_at < :date', { date: sevenDaysAgo })
+          .getRawOne(),
+      ]);
+
+      const ejarNow = Number(ejarNowRaw.sum);
+      const ejarBefore = Number(ejarBeforeRaw.sum);
+
+      return {
+        activeContracts: {
+          value: activeNow,
+          changePercent: this.percentChange(activeNow, activeBefore),
+        },
+        totalPendingRenewRequests: {
+          value: pendingNow,
+          changePercent: this.percentChange(pendingNow, pendingBefore),
+        },
+        totalAmountWithEjar: {
+          value: ejarNow,
+          changePercent: this.percentChange(ejarNow, ejarBefore),
+        },
+      };
+    }
+
+
+    return {};
+  }
+
+  async getDashboardChartData(user: any) {
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    if (user.role === UserRole.ADMIN) {
+      // Contracts per day (last 7 days)
+      const [contractsPerDay, statusBreakdown] = await Promise.all([
+        this.contractRepo
+          .createQueryBuilder('c')
+          .select('DATE(c.created_at)', 'date')
+          .addSelect('COUNT(c.id)', 'count')
+          .where('c.created_at >= :sevenDaysAgo', { sevenDaysAgo })
+          .groupBy('DATE(c.created_at)')
+          .orderBy('DATE(c.created_at)', 'ASC').getRawMany(),
+        this.contractRepo
+          .createQueryBuilder('c')
+          .select('c.status', 'status')
+          .addSelect('COUNT(c.id)', 'count')
+          .groupBy('c.status')
+          .getRawMany()
+
+      ])
+
+
+      // Fill in missing days with 0
+      const dateMap = new Map<string, number>();
+
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i); // Subtracting 6, 5... down to 0 (today)
+
+        const dateStr = date.toISOString().split('T')[0];
+        dateMap.set(dateStr, 0);
+      }
+      contractsPerDay.forEach((item: any) => {
+        const dateStr = new Date(item.date).toISOString().split('T')[0];
+        dateMap.set(dateStr, parseInt(item.count, 10));
+      });
+
+      const contractsData = Array.from(dateMap.values());
+
+
+
+      const statusMap: Record<string, number> = {};
+      let totalContracts = 0;
+      statusBreakdown.forEach((item: any) => {
+        statusMap[item.status] = parseInt(item.count, 10);
+        totalContracts += parseInt(item.count, 10);
+      });
+
+      return {
+        contractsPerDay: contractsData,
+        statusBreakdown: statusMap,
+        totalContracts,
+      };
+    }
+
+    if (user.role === UserRole.LANDLORD) {
+      // Get contracts for this landlord for analytics
+      const contracts = await this.contractRepo.find({
+        where: { landlordId: user.id },
+        order: { created_at: 'DESC' },
+        take: 12,
+      });
+
+      const monthlyData = new Array(12).fill(0);
+      contracts.forEach((contract) => {
+        const month = new Date(contract.created_at).getMonth();
+        monthlyData[month] = (monthlyData[month] || 0) + 1;
+      });
+
+      return {
+        rentedAnalytics: monthlyData,
+      };
+    }
+
+    return {};
+  }
+
+  async getRecentContracts(user: any) {
+    const query = this.contractRepo
+      .createQueryBuilder('contract')
+      .leftJoinAndSelect('contract.property', 'property')
+      .leftJoinAndSelect('contract.review', 'review')
+      .orderBy('contract.created_at', 'DESC')
+      .take(7);
+
+    // Apply Role Filters
+    if (user.role === UserRole.LANDLORD) {
+      query.where('contract.landlordId = :userId', { userId: user.id });
+    } else if (user.role === UserRole.TENANT) {
+      query.where('contract.tenantId = :userId', { userId: user.id });
+    }
+
+    const contracts = await query.getMany();
+
+    return contracts.map((contract: any) => ({
+      id: contract.id,
+      propertyName: contract.propertySnapshot?.name || 'Unknown Property',
+      propertyId: contract.propertyId,
+      date: contract.created_at,
+      status: contract.status,
+      price: contract.totalAmount,
+      // Add review data if it exists
+      review: contract.review ? {
+        id: contract.review.id,
+        rate: contract.review.rate,
+        comment: contract.review.reviewText
+      } : null,
+      property: contract.property ? {
+        id: contract.property.id,
+        slug: contract.property.slug,
+        images: contract.property.images,
+      } : null,
+    }));
   }
 }

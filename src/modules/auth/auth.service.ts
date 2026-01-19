@@ -119,13 +119,19 @@ export class AuthService {
         const { name, email, password, role } = createUserDto;
 
         // 1) Prevent duplicate emails
-        const existingUser = await this.userRepository.findOne({ where: { email } });
-        if (existingUser) { throw new ConflictException('Email already exists'); }
-        // 2) Prevent self-assigning admin role
+        let user = await this.userRepository.findOne({ where: { email, status: UserStatus.PENDING_VERIFICATION } });
+
         if (role === UserRole.ADMIN) { throw new ForbiddenException('You cannot assign yourself as admin'); }
         // 3) Create user
-        const user = await this.usersService.create({ name, email, password, role });
-
+        if (user) {
+            const hashed = await bcrypt.hash(password, 10);
+            user.name = name;
+            user.passwordHash = hashed;
+            user.role = role;
+        } else {
+            // Create new user record
+            user = await this.usersService.create({ name, email, password, role });
+        }
         // 4) Generate email verification code
         const code = uuidv4();
         const now = new Date();
@@ -325,7 +331,7 @@ export class AuthService {
         await this.userRepository.save(user);
 
         const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
-        const redirectUrl = `${frontendUrl}/auth/sign-in`;
+        const redirectUrl = `${frontendUrl}/auth/sign-in?success=verified`;
 
         return { redirectUrl };
     }

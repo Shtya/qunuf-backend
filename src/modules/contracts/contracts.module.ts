@@ -10,6 +10,7 @@ import { User } from 'src/common/entities/user.entity';
 import { RenewRequest } from 'src/common/entities/renew_request';
 import { ContractSubscriber } from './contract.subscriber';
 import { EmailModule } from '../email/email.module';
+import { Review } from 'src/common/entities/review.entity';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { EmailModule } from '../email/email.module';
       User,
       Property,
       Settings,
-      RenewRequest
+      RenewRequest,
+      Review
     ]),
     NotificationModule, // ⬅️ required for NotificationService
     EmailModule, // ⬅️ required for EmailService

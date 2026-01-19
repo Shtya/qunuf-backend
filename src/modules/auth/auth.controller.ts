@@ -60,10 +60,15 @@ export class AuthController {
     @ApiResponse({ status: 401, description: 'Invalid verification code' })
     @ApiResponse({ status: 302, description: 'Redirects to frontend sign-in page' })
     async verify(@Query('code') code: string, @Query('email') email: string, @Res() res: Response) {
-        const { redirectUrl } = await this.authService.verify(code, email);
+        try {
+            const { redirectUrl } = await this.authService.verify(code, email);
+            return res.redirect(redirectUrl);
+        } catch (err) {
+            return res.redirect(
+                `${process.env.FRONTEND_URL}/auth/sign-in?error=confirmation_failed`,
+            );
+        }
 
-
-        return res.redirect(redirectUrl);
     }
 
     @Post('forgot-password')

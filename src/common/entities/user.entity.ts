@@ -140,7 +140,7 @@ export class User extends CoreEntity {
     // @JoinColumn({ name: 'address_id' })
     // address?: Relation<Address | null>;
 
-    @Column({ type: 'varchar', name: "short_address", length: 8, unique: true, nullable: true, })
+    @Column({ type: 'varchar', name: "short_address", length: 8, nullable: true, })
     shortAddress: string | null;
 
     @OneToMany('Session', 'User')
