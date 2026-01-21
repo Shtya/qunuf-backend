@@ -6,6 +6,7 @@ import { CustomValidationPipe } from './common/pipes/customValidation.pipe';
 import { GlobalExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -28,6 +29,7 @@ async function bootstrap() {
     defaultVersion: '1',
   });
 
+  app.use(json({ limit: '10mb' }));
 
   app.useStaticAssets(join(__dirname, '..', '/uploads'), { prefix: '/uploads/' });
 

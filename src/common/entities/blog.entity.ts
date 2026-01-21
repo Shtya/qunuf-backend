@@ -15,11 +15,11 @@ export class Blog extends CoreEntity {
     @ApiProperty({ description: 'Title in English' })
     title_en: string;
 
-    @Column({ type: 'text', name: 'description_ar' })
+    @Column({ type: 'jsonb', name: 'description_ar' })
     @ApiProperty({ description: 'Description in Arabic', required: true })
     description_ar: string;
 
-    @Column({ type: 'text', name: 'description_en' })
+    @Column({ type: 'jsonb', name: 'description_en' })
     @ApiProperty({ description: 'Description in English', required: true })
     description_en: string;
 

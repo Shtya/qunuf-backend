@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateBlogDto {
     @ApiProperty({ maxLength: 255, example: 'My First Blog' })
@@ -8,10 +9,13 @@ export class CreateBlogDto {
     @IsNotEmpty()
     title_ar: string;
 
-    @ApiProperty({ description: 'The content of the blog' })
-    @IsString()
     @IsNotEmpty()
-    description_ar: string;
+    @Transform(({ value }) => {
+        // If it's a string (from FormData), parse it. If already an object, return it.
+        return typeof value === 'string' ? JSON.parse(value) : value;
+    })
+    @IsObject() // Now this will pass because the string became an object
+    description_ar: any;
 
     @ApiProperty({ maxLength: 255, example: 'My First Blog' })
     @IsString()
@@ -19,10 +23,12 @@ export class CreateBlogDto {
     @IsNotEmpty()
     title_en: string;
 
-    @ApiProperty({ description: 'The content of the blog' })
-    @IsString()
     @IsNotEmpty()
-    description_en: string;
+    @Transform(({ value }) => {
+        return typeof value === 'string' ? JSON.parse(value) : value;
+    })
+    @IsObject()
+    description_en: any;
 
     @ApiProperty({ type: 'string', format: 'binary' })
     @IsOptional()

@@ -1,25 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsNumber, MaxLength, IsObject } from 'class-validator';
 
 export class UpdateSettingsDto {
     @ApiProperty({ description: 'Privacy policy (English)', required: false })
     @IsOptional()
-    @IsString()
+    @IsObject()
     privacyPolicy_en?: string;
 
     @ApiProperty({ description: 'Terms of service (English)', required: false })
     @IsOptional()
-    @IsString()
+    @IsObject()
     termsOfService_en?: string;
 
     @ApiProperty({ description: 'Privacy policy (Arabic)', required: false })
     @IsOptional()
-    @IsString()
+    @IsObject()
     privacyPolicy_ar?: string;
 
     @ApiProperty({ description: 'Terms of service (Arabic)', required: false })
     @IsOptional()
-    @IsString()
+    @IsObject()
     termsOfService_ar?: string;
 
     @ApiProperty({ description: 'Address', required: false })
