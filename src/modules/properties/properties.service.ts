@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Property, PropertyStatus } from 'src/common/entities/property.entity';
+import { CommercialSubType, DocumentType, OwnershipType, Property, PropertyStatus, PropertyType, RentType, ResidentialSubType } from 'src/common/entities/property.entity';
 import { User, UserRole } from 'src/common/entities/user.entity';
 import { LessThanOrEqual, Not, Repository } from 'typeorm';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -15,6 +15,7 @@ import { NotificationService } from '../notification/notification.service';
 import { generateSlugHelper, trimText } from 'src/common/utils/helpers';
 import { ExportService } from 'src/common/services/exportService';
 import { UserDataMasker } from 'src/common/utils/UserDataMasker';
+import { faker } from '@faker-js/faker';
 
 @Injectable()
 export class PropertiesService {
@@ -32,6 +33,8 @@ export class PropertiesService {
         private readonly exportService: ExportService,
     ) { }
 
+
+    
 
     async create(
         userId: string,

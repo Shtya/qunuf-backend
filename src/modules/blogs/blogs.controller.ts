@@ -36,7 +36,6 @@ export class BlogsController {
 
     ) { }
 
-
     @Get()
     @ApiOperation({ summary: 'Get blogs with cursor pagination' })
     @ApiQuery({ name: 'cursor', required: false, type: String, description: 'Base64 encoded cursor of id and createdAt' })

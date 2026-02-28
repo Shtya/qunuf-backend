@@ -5,16 +5,16 @@ import { CoreEntity } from "./coreEntity";
 
 @Entity('settings')
 export class Settings extends CoreEntity {
-    @Column({ name: "privacy_policy_en", type: 'text', nullable: true })
+    @Column({ name: "privacy_policy_en", type: 'jsonb', nullable: true })
     privacyPolicy_en: string | null;
 
-    @Column({ name: "terms_of_service_en", type: 'text', nullable: true })
+    @Column({ name: "terms_of_service_en", type: 'jsonb', nullable: true })
     termsOfService_en: string | null;
 
-    @Column({ name: "privacy_policy_ar", type: 'text', nullable: true })
+    @Column({ name: "privacy_policy_ar", type: 'jsonb', nullable: true })
     privacyPolicy_ar: string | null;
 
-    @Column({ name: "terms_of_service_ar", type: 'text', nullable: true })
+    @Column({ name: "terms_of_service_ar", type: 'jsonb', nullable: true })
     termsOfService_ar: string | null;
 
     @Column({ type: 'text', nullable: true })
