@@ -1,0 +1,131 @@
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Blog } from "src/common/entities/blog.entity";
+import { Not, Repository } from "typeorm";
+import { CreateBlogDto } from "./dto/create-blog.dto";
+import { UpdateBlogDto } from "./dto/update-blog.dto";
+import { deleteFile } from "src/common/utils/file.util";
+import { CRUD } from "src/common/services/crud.service";
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { generateSlugHelper } from "src/common/utils/helpers";
+import { faker } from '@faker-js/faker';
+
+@Injectable()
+export class BlogsService {
+    constructor(
+        @InjectRepository(Blog)
+        private readonly blogRepo: Repository<Blog>,
+    ) { }
+
+    // blogs.service.ts
+
+    async findAllCursor(cursor?: { createdAt: Date; id: string }, limit: number = 20) {
+        const queryBuilder = this.blogRepo.createQueryBuilder('blog').select([
+            'blog.id',
+            'blog.created_at',
+            'blog.updated_at',
+            'blog.deleted_at',
+            'blog.title_ar',
+            'blog.title_en',
+            'blog.imagePath',
+            'blog.slug',
+        ]);
+
+        return CRUD.paginateCursor({
+            queryBuilder,
+            alias: 'blog',
+            cursor,
+            limit,
+        });
+    }
+
+    async findMostRecent() {
+        const blog = this.blogRepo
+            .createQueryBuilder('blog')
+            .orderBy('blog.created_at', 'DESC')
+            .getOne();
+        if (!blog) throw new NotFoundException(`No blog not found`);
+
+        return blog;
+    }
+
+
+    async create(dto: CreateBlogDto, imagePath: string): Promise<Blog> {
+        const slug = generateSlugHelper(dto.title_en);
+
+        const existing = await this.blogRepo.findOne({ where: { slug } });
+        if (existing) {
+            throw new BadRequestException(`Blog with title "${dto.title_en}" already exists`)
+        }
+        if (!imagePath) {
+            throw new BadRequestException('Image is required');
+        }
+
+        const blog = this.blogRepo.create({ ...dto, imagePath: imagePath });
+        return await this.blogRepo.save(blog);
+    }
+
+    async findOneBySlug(slug: string): Promise<Blog> {
+        const blog = await this.blogRepo.findOne({ where: { slug } });
+        if (!blog) throw new NotFoundException(`Blog with slug "${slug}" not found`);
+        return blog;
+    }
+
+
+    async findPagination(query: PaginationDto) {
+        return CRUD.findAll(
+            this.blogRepo,
+            'blog',
+            '',
+            query.page,
+            query.limit,
+            query.sortBy,
+            query.sortOrder,
+            [], // relations
+            [], // search fields
+        );
+    }
+
+    async update(id: string, dto: UpdateBlogDto, imagePath?: string): Promise<Blog> {
+        // 1. Check if the blog exists first
+        const blog = await this.blogRepo.findOne({ where: { id } });
+        if (!blog) {
+            throw new NotFoundException(`Blog not found`);
+        }
+
+        // 2. Handle slug logic if title is being updated
+        let newSlug = blog.slug;
+        if (dto.title_en && dto.title_en !== blog.title_en) {
+            newSlug = generateSlugHelper(dto.title_en); // Your regex helper
+
+            // Check if this slug is already taken by ANOTHER blog
+            const slugExists = await this.blogRepo.findOne({
+                where: { slug: newSlug, id: Not(id) }
+            });
+
+            if (slugExists) {
+                throw new BadRequestException(`A blog with the title "${dto.title_en}" already exists.`);
+            }
+        }
+
+        Object.assign(blog, dto);
+        if (imagePath) {
+            await deleteFile(blog.imagePath);
+            blog.imagePath = imagePath;
+        }
+        // 4. Save and return
+        return await this.blogRepo.save(blog);
+    }
+
+    async remove(id: string): Promise<{ deleted: boolean }> {
+        const existing = await this.blogRepo.findOne({ where: { id } });
+        if (!existing) throw new NotFoundException('Blog not found');
+
+        if (existing.imagePath) await deleteFile(existing.imagePath);
+
+        await this.blogRepo.delete(id);
+
+        return { deleted: true };
+    }
+
+}
