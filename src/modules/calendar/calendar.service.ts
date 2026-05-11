@@ -17,7 +17,7 @@ import { CreateCalendarEventDto } from './dto/create-calendar-event.dto';
 import { UpdateCalendarEventDto } from './dto/update-calendar-event.dto';
 import { CalendarFilterDto } from './dto/calendar-filter.dto';
 import { SaveGoogleCredentialDto } from './dto/save-google-credential.dto';
-import { addDays, parseISO } from 'date-fns';
+import { addDays, parseISO, startOfDay } from 'date-fns';
 
 // ─── Normalised event shape sent to the client ────────────────────────────────
 
@@ -280,7 +280,7 @@ export class CalendarService {
                     sourceId: ce.id,
                     url: ce.url,
                     metadata: { description: ce.description, allDay: ce.allDay },
-                    overrideColor: ce.color,
+                    overrideColor: ce.color ?? undefined,
                 }));
             }
         }
