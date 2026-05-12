@@ -14,17 +14,13 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: [
-      'http://localhost:3000', 
-      'http://localhost:3001', 
-      'https://localhost:3001', 
-			"https://qunuf.com"
-    ],
+    origin: '*',  // Allow all origins
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
+    credentials: true,  // Enable credentials if needed (cookies, etc.)
     allowedHeaders: 'Content-Type,Authorization,x-lang',
     exposedHeaders: 'Content-Length,Content-Range',
   });
+  
   app.setGlobalPrefix('api');
 
   app.enableVersioning({
