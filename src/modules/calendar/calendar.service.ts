@@ -30,7 +30,8 @@ export type AggregatedEventType =
     | 'payment_made'
     | 'renewal_request'
     | 'custom'
-    | 'reminder';
+    | 'reminder'
+    | 'maintenance';
 
 export interface AggregatedEvent {
     id: string;
@@ -58,6 +59,7 @@ const EVENT_COLORS: Record<AggregatedEventType, string> = {
     renewal_request: '#8B5CF6',
     custom: '#4F46E5',
     reminder: '#EC4899',
+    maintenance: '#F59E0B',
 };
 
 @Injectable()
@@ -259,7 +261,7 @@ export class CalendarService {
         }
 
         // ── 3. Custom user events ──────────────────────────────────────────────
-        if (wantsType('custom') || wantsType('reminder')) {
+        if (wantsType('custom') || wantsType('reminder') || wantsType('maintenance')) {
             const customEvents = await this.calendarEventRepo.find({
                 where: {
                     userId,
@@ -270,6 +272,21 @@ export class CalendarService {
 
             for (const ce of customEvents) {
                 if (requestedTypes && !requestedTypes.includes(ce.eventType)) continue;
+
+                const eventMetadata: Record<string, unknown> = {
+                    description: ce.description,
+                    allDay: ce.allDay,
+                };
+
+                // For maintenance events, extract workOrderId from the embedded URL
+                if (ce.eventType === 'maintenance' && ce.url) {
+                    try {
+                        const qs = ce.url.split('?')[1] ?? '';
+                        const workOrderId = new URLSearchParams(qs).get('workOrder');
+                        if (workOrderId) eventMetadata.workOrderId = workOrderId;
+                    } catch { /* ignore malformed URLs */ }
+                }
+
                 events.push(this.buildEvent({
                     id: `custom_${ce.id}`,
                     title: ce.title,
@@ -279,7 +296,7 @@ export class CalendarService {
                     source: 'custom',
                     sourceId: ce.id,
                     url: ce.url,
-                    metadata: { description: ce.description, allDay: ce.allDay },
+                    metadata: eventMetadata,
                     overrideColor: ce.color ?? undefined,
                 }));
             }

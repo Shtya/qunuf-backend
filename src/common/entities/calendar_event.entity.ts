@@ -5,6 +5,7 @@ import { User } from './user.entity';
 export enum CalendarEventType {
     CUSTOM = 'custom',
     REMINDER = 'reminder',
+    MAINTENANCE = 'maintenance',
 }
 
 @Entity('calendar_events')

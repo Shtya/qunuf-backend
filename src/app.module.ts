@@ -30,6 +30,8 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { ContractAutoTerminatorService } from './common/backgroundServices/contract_auto_terminator_service';
 import { ContractAutoRenewTerminatorService } from './common/backgroundServices/contact_auto_renew_terminator_service';
 import { SharedModule } from './modules/shared.module';
+import { MaintenanceModule } from './modules/maintenance/maintenance.module';
+import { MaintenanceBackgroundService } from './common/backgroundServices/maintenance_background_service';
 
 @Module({
   imports: [
@@ -89,8 +91,9 @@ import { SharedModule } from './modules/shared.module';
     ContractsModule,
     ReviewsModule,
     CalendarModule,
+    MaintenanceModule,
   ],
   controllers: [AppController, AuthController],
-  providers: [CustomValidationPipe, ContractAutoTerminatorService, ContractAutoRenewTerminatorService],
+  providers: [CustomValidationPipe, ContractAutoTerminatorService, ContractAutoRenewTerminatorService, MaintenanceBackgroundService],
 })
 export class AppModule { }
