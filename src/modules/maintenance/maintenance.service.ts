@@ -364,7 +364,7 @@ export class MaintenanceService {
         return this.workOrderRepo.findOne({
             where: { id: saved.id },
             relations: ['property', 'provider', 'createdBy'],
-        });
+        })! as any;
     }
 
     async updateWorkOrder(id: string, dto: UpdateWorkOrderDto, userId: string, userRole: UserRole): Promise<WorkOrder> {
@@ -471,7 +471,7 @@ export class MaintenanceService {
                 WorkOrderStatus.COMPLETED,
                 WorkOrderStatus.SCHEDULED,
             ];
-            if (!tenantAllowed.includes(dto.status)) {
+            if (dto.status !== undefined && !tenantAllowed.includes(dto.status)) {
                 throw new BadRequestException('Invalid status for tenant');
             }
             // Mark access approved whenever tenant actively reports the provider was there
@@ -544,7 +544,9 @@ export class MaintenanceService {
         }
 
         workOrder.tenantRating = dto.rating;
-        workOrder.tenantRatingComment = dto.comment;
+        if (dto.comment !== undefined) {
+            workOrder.tenantRatingComment = dto.comment;
+        }
         workOrder.status = WorkOrderStatus.CLOSED;
 
         const saved = await this.workOrderRepo.save(workOrder);

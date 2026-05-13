@@ -46,7 +46,7 @@ export class WorkOrder extends CoreEntity {
     category: ServiceCategory;
 
     @Column({ type: 'timestamptz', nullable: true, name: 'due_date' })
-    dueDate: Date;
+    dueDate: Date | null;
 
     @Column({ type: 'timestamptz', nullable: true, name: 'completed_date' })
     completedDate: Date;
@@ -61,7 +61,7 @@ export class WorkOrder extends CoreEntity {
     tenantRating: number;
 
     @Column({ type: 'text', nullable: true, name: 'tenant_rating_comment' })
-    tenantRatingComment: string;
+    tenantRatingComment: string | null;
 
     @Column({ type: 'boolean', default: false, name: 'tenant_access_approved' })
     tenantAccessApproved: boolean;
@@ -85,7 +85,7 @@ export class WorkOrder extends CoreEntity {
     provider: ServiceProvider;
 
     @Column({ type: 'uuid', nullable: true, name: 'provider_id' })
-    providerId: string;
+    providerId: string | null;
 
     @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true, eager: true })
     @JoinColumn({ name: 'created_by_id' })
