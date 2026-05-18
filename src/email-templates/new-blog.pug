@@ -17,8 +17,8 @@ html
 body
   .container
 
-    if blogImageCid
-      img.header-image(src=`cid:${blogImageCid}` alt=blogTitle style="width:100%; height:auto; display:block;")
+    if blogImageUrl
+      img.header-image(src=blogImageUrl alt=blogTitle style="width:100%; height:auto; display:block;")
 
     .content
       p(style="color: #007bff; font-weight: bold; text-transform: uppercase; font-size: 12px;") New Post Published
