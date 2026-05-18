@@ -145,7 +145,7 @@ export class AuthService {
         await this.userRepository.save(user);
 
         // 5) Build verification link
-        const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:8081');
+        const appUrl = this.configService.get<string>('APP_URL', 'https://api.qunuf.com');
         const link = `${appUrl}/api/v1/auth/verify-email?code=${code}&email=${user.email}`;
 
         await this.emailService.sendVerificationEmail(user.email, link);
@@ -267,7 +267,7 @@ export class AuthService {
         try {
             await this.emailService.sendResetPasswordEmail(user.email, resetLink);
             console.log('[ForgotPassword] Email sent successfully to:', user.email);
-        } catch (err) {
+        } catch (err:any) {
             console.error('[ForgotPassword] Failed to send email:', err?.message);
         }
 
