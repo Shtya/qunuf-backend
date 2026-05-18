@@ -51,7 +51,7 @@ import { MaintenanceBackgroundService } from './common/backgroundServices/mainte
           autoLoadEntities: true,
           synchronize: process.env.NODE_ENV === 'development',
           migrations: [__dirname + '/database/migration/**/*{.js,.ts}'],
-          logging: 'all'
+          logging: false
         })
       },
     }),

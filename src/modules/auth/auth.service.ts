@@ -258,7 +258,18 @@ export class AuthService {
         const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
         const resetLink = `${frontendUrl}/auth/reset-password?code=${code}&email=${encodeURIComponent(user.email)}`;
 
-        await this.emailService.sendResetPasswordEmail(user.email, resetLink);
+        console.log('[ForgotPassword] Sending reset email to:', user.email);
+        console.log('[ForgotPassword] SMTP_HOST:', process.env.SMTP_HOST);
+        console.log('[ForgotPassword] SMTP_USER:', process.env.SMTP_USER);
+        console.log('[ForgotPassword] EMAIL_FROM:', process.env.EMAIL_FROM);
+        console.log('[ForgotPassword] EMAIL_USER:', process.env.EMAIL_USER ?? '(not set — good)');
+
+        try {
+            await this.emailService.sendResetPasswordEmail(user.email, resetLink);
+            console.log('[ForgotPassword] Email sent successfully to:', user.email);
+        } catch (err) {
+            console.error('[ForgotPassword] Failed to send email:', err?.message);
+        }
 
         return { message: 'If the email is registered, a reset link has been sent' };
     }
